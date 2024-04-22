@@ -1,4 +1,5 @@
 const {request} = require("../utils/request")
+const {log} = require("pinski/util/common")
 
 class InstancesList {
 	constructor() {
@@ -16,9 +17,13 @@ class InstancesList {
 	 */
 	update() {
 		return this.inflight = request("https://api.invidious.io/instances.json?sort_by=health").then(res => res.json()).then(list => {
-			list = list.filter(i => i[1].type === "https").map(i => i[1].uri.replace(/\/+$/, ""))
-			this.list = list
+			return list.filter(i => i[1].type === "https").map(i => i[1].uri.replace(/\/+$/, ""))
+		}).catch(e => {
+			log(`[background/instances] ${e.message}`, "warning")
+			return []
+		}).then(list => {
 			this.inflight = null
+			this.list = list
 			return this.list
 		})
 	}
