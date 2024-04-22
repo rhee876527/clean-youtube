@@ -10,7 +10,7 @@
   "author": "",
   "license": "AGPL-3.0",
   "dependencies": {
-    "better-sqlite3": "^7.4.5",
+    "better-sqlite3": "^9.5.0",
     "cookie": "^0.4.1",
     "denque": "^1.5.1",
     "mixin-deep": "^2.0.1",
