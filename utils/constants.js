@@ -18,8 +18,8 @@ let constants = {
 			default: false
 		},
 		local: {
-			type: "boolean",
-			default: false
+			type: "integer",
+			default: 0
 		},
 		quality: {
 			type: "integer",

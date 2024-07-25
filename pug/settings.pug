@@ -57,11 +57,12 @@ block content
 
         +select({
           id: "local",
-          label: "Fetch videos from",
-          description: 'If remote, the instance above will be used.\nIf local, CloudTube will try to connect to an instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
+          label: "Play videos on",
+          description: 'If CloudTube, the instance above will be used.\nIf YouTube, you will be redirected there.\nIf local, CloudTube will try to connect to a NewLeaf/Invidious instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
           options: [
-            {value: "0", text: "Remote instance"},
-            {value: "1", text: "Locally"}
+            {value: "0", text: "CloudTube"},
+            {value: "2", text: "YouTube"},
+            {value: "1", text: "Local"},
           ]
         })
 

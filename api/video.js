@@ -108,6 +108,20 @@ module.exports = [
 			const settings = user.getSettingsOrDefaults()
 			const id = url.searchParams.get("v")
 
+			// Check if should watch on YouTube
+			if (settings.local === 2) {
+				const dest = `https://www.youtube.com${url.pathname}${url.search}#cloudtube`
+				user.addWatchedVideoMaybe(id)
+				return {
+					statusCode: 302,
+					contentType: "text/plain",
+					headers: {
+						"Location": dest
+					},
+					content: `Redirecting to ${dest}...`
+				}
+			}
+
 			// Check if playback is allowed
 			const videoTakedownInfo = db.prepare("SELECT id, org, url FROM TakedownVideos WHERE id = ?").get(id)
 			if (videoTakedownInfo) {
@@ -128,7 +142,7 @@ module.exports = [
 
 			// Work out how to fetch the video
 			if (req.method === "GET") {
-				if (settings.local) { // skip to the local fetching page, which will then POST video data in a moment
+				if (settings.local === 1) { // skip to the local fetching page, which will then POST video data in a moment
 					return render(200, "pug/local-video.pug", {req, settings, id})
 				}
 				var instanceOrigin = settings.instance
