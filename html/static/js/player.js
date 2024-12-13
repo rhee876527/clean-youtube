@@ -19,9 +19,17 @@ for (const f of [].concat(
 
 function getBestAudioFormat() {
 	let best = null
+	let aidub = false
 	for (const f of audioFormats.values()) {
-		if (best === null || f.bitrate > best.bitrate) {
-			best = f
+		if (f.resolution.includes("default")) {
+			aidub = true
+		}
+	}
+	for (const f of audioFormats.values()) {
+		if (!aidub || f.resolution.includes("default")) {
+			if (best === null || f.bitrate > best.bitrate) {
+				best = f
+			}
 		}
 	}
 	return best
