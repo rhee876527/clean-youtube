@@ -1,250 +1,510 @@
-import {q, qa, ElemJS} from "/static/js/elemjs/elemjs.js"
-import {SubscribeButton} from "/static/js/modules/SubscribeButton.js"
+import { q, qa, ElemJS } from "/static/js/elemjs/elemjs.js";
+import { SubscribeButton } from "/static/js/modules/SubscribeButton.js";
 
-const video = q("#video")
-const audio = q("#audio")
+const videoElement = q("#video");
+const audioElement = q("#audio");
+// Buffer audio aggressively
+audioElement.preload = "auto";
 
-const videoFormats = new Map()
-const audioFormats = new Map()
-for (const f of [].concat(
-	data.formatStreams.map(f => (f.isAdaptive = false, f)),
-	data.adaptiveFormats.map(f => (f.isAdaptive = true, f))
-)) {
-	if (f.type.startsWith("video")) {
-		videoFormats.set(f.itag, f)
-	} else {
-		audioFormats.set(f.itag, f)
-	}
-}
+// Make video focusable
+videoElement.setAttribute("tabindex", "0");
+
+let userInteracted = false;
+document.addEventListener("click", () => { userInteracted = true; }, { once: true });
+
+let syncCheckInterval = null;
+const videoFormats = new Map();
+const audioFormats = [];
+
+[...data.formatStreams, ...data.adaptiveFormats].forEach(f => {
+    f.isAdaptive = f.type.startsWith("video");
+    if (f.type.startsWith("video")) {
+        videoFormats.set(f.itag, f);
+    } else {
+        audioFormats.push(f);
+    }
+});
 
 function getBestAudioFormat() {
-	let best = null
-	let aidub = false
-	for (const f of audioFormats.values()) {
-		if (f.resolution.includes("default")) {
-			aidub = true
-		}
-	}
-	for (const f of audioFormats.values()) {
-		if (!aidub || f.resolution.includes("default")) {
-			if (best === null || f.bitrate > best.bitrate) {
-				best = f
-			}
-		}
-	}
-	return best
+    function parseXtags(url) {
+        const urlParams = new URLSearchParams(url.split('?')[1] ?? '');
+        const xtags = urlParams.get('xtags') ?? '';
+        const parts = xtags.split(':');
+        let language = 'unknown';
+        let content = 'unknown';
+        for (const part of parts) {
+            if (part.startsWith('lang=')) {
+                language = part.replace('lang=', '');
+                if (language.includes('-')) language = language.split('-')[0];
+            }
+            if (part.startsWith('acont=')) content = part.replace('acont=', '');
+        }
+        return { language, content };
+    }
+
+    let best = null;
+
+    for (const f of audioFormats) {
+        if (!isValidUrl(f.url)) continue;
+        const { language, content } = parseXtags(f.url);
+        if (language === 'en' && content === 'original') {
+            if (!best || f.bitrate > best.bitrate) {
+                best = f;
+            }
+        }
+    }
+
+    if (!best) {
+        for (const f of audioFormats) {
+            if (!isValidUrl(f.url)) continue;
+            const { language } = parseXtags(f.url);
+            if (language === 'en') {
+                if (!best || f.bitrate > best.bitrate) {
+                    best = f;
+                }
+            }
+        }
+    }
+
+    if (!best) {
+        for (const f of audioFormats) {
+            if (!isValidUrl(f.url)) continue;
+            if (!best || f.bitrate > best.bitrate) {
+                best = f;
+            }
+        }
+    }
+
+    return best;
 }
+
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function loadMediaWithRetry(mediaElement, url, retries = 6) {
+    let attempt = 0;
+    let locked = false; // lock once playback ever begins
+
+    const load = () => {
+        if (locked) return; // never reload after playback has started
+
+        mediaElement.src = url;
+        mediaElement.load();
+
+        // Lock out retries once playback begins
+        mediaElement.onplaying = () => {
+            locked = true;
+        };
+
+        mediaElement.oncanplay = () => {
+            // Also lock out once itâ€™s ready to play (in case play() isnâ€™t called yet)
+            locked = true;
+        };
+
+        mediaElement.onerror = () => {
+            if (locked) return; // ignore errors after lock
+
+            attempt++;
+            if (attempt < retries) {
+                setTimeout(load, 4000 * attempt);
+            } else {
+                console.error("Failed to load media after", retries, "attempts.");
+            }
+        };
+    };
+
+    load();
+}
+
+let pipReady = false;
+
+document.addEventListener("visibilitychange", async () => {
+    const video = document.querySelector("video");
+    if (!video || !document.pictureInPictureEnabled) return;
+
+    if (document.hidden && !document.pictureInPictureElement && !video.paused) {
+        if (!pipReady) {
+            console.warn("PiP blocked. Waiting for user gesture to enable re-entry.");
+            return;
+        }
+
+        try {
+            await video.requestPictureInPicture();
+        } catch (err) {
+            console.error("PiP request failed:", err);
+        }
+    }
+});
+
+document.addEventListener("leavepictureinpicture", () => {
+    pipReady = false;
+});
+
+document.addEventListener("click", () => {
+    pipReady = true;
+});
+
+const audioContext = new AudioContext();
 
 class FormatLoader {
-	constructor() {
-		this.npv = videoFormats.get(q("#video").getAttribute("data-itag"))
-		this.npa = null
-	}
+    constructor() {
+        this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
+        this.npa = null;
+    }
 
-	play(itag) {
-		this.npv = videoFormats.get(itag)
-		if (this.npv.isAdaptive) {
-			this.npa = getBestAudioFormat()
-		} else {
-			this.npa = null
-		}
-		this.update()
-	}
+    play(itag) {
+        this.npv = videoFormats.get(itag);
+        this.npa = null;
 
-	update() {
-		const lastTime = video.currentTime
-		video.src = this.npv.url
-		video.currentTime = lastTime
-		if (this.npa) {
-			audio.src = this.npa.url
-			audio.pause()
-			audio.currentTime = lastTime
-		} else {
-			audio.pause()
-			audio.removeAttribute("src")
-		}
-	}
+        // Only attach separate audio if the stream has no audio codec
+        const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
+        if (!hasAudio) {
+            const bestAudio = getBestAudioFormat();
+            if (bestAudio && bestAudio.url !== this.npv.url) {
+                this.npa = bestAudio;
+            }
+        }
+
+        this.update();
+    }
+
+    update() {
+        cleanupSync();
+        const lastTime = videoElement.currentTime;
+
+        loadMediaWithRetry(videoElement, this.npv.url);
+        videoElement.currentTime = lastTime;
+
+        if (this.npa) {
+            audioElement.pause();
+            audioElement.src = "";
+            loadMediaWithRetry(audioElement, this.npa.url);
+            audioElement.currentTime = lastTime;
+        } else {
+            audioElement.pause();
+            audioElement.removeAttribute("src");
+        }
+    }
 }
 
-const formatLoader = new FormatLoader()
+
+const formatLoader = new FormatLoader();
 
 class PlayManager {
-	constructor(media, isAudio) {
-		this.media = media
-		this.isAudio = isAudio
-	}
+    constructor(media, isAudio) {
+        this.media = media;
+        this.isAudio = isAudio;
+    }
 
-	isActive() {
-		return !this.isAudio || formatLoader.npa
-	}
+    isActive() {
+        return !this.isAudio || formatLoader.npa;
+    }
 
-	play() {
-		if (this.isActive()) this.media.play()
-	}
+    play() {
+        if (this.isActive()) this.media.play();
+    }
 
-	pause() {
-		if (this.isActive()) this.media.pause()
-	}
+    pause() {
+        if (this.isActive()) this.media.pause();
+    }
 }
 
 const playManagers = {
-	video: new PlayManager(video, false),
-	audio: new PlayManager(audio, true)
-}
+    video: new PlayManager(videoElement, false),
+    audio: new PlayManager(audioElement, true)
+};
 
 class QualitySelect extends ElemJS {
-	constructor() {
-		super(q("#quality-select"))
-		this.on("input", this.setFormat.bind(this))
-		this.setFormat()
-	}
+    constructor() {
+        super(q("#quality-select"));
+        this.on("input", this.setFormat.bind(this));
+        this.setFormat();
+    }
 
-	setFormat() {
-		const itag = this.element.value
-		formatLoader.play(itag)
-		video.focus()
-	}
+    setFormat() {
+        const itag = this.element.value;
+        formatLoader.play(itag);
+        videoElement.focus();
+    }
 }
 
-const qualitySelect = new QualitySelect()
+new QualitySelect();
 
-const ignoreNext = {
-	play: 0
+const ignoreNext = { play: 0 };
+
+function startSyncCheck() {
+    if (syncCheckInterval) clearInterval(syncCheckInterval);
+    syncCheckInterval = setInterval(() => {
+        if (!videoElement.paused && !audioElement.paused) {
+            const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+            if (drift > 0.1) {
+                audioElement.currentTime = videoElement.currentTime;
+            }
+        }
+    }, 1000);
 }
+
+function stopSyncCheck() {
+    if (syncCheckInterval) clearInterval(syncCheckInterval);
+    syncCheckInterval = null;
+}
+
+function cleanupSync() {
+    stopSyncCheck();
+}
+
+videoElement.addEventListener("play", startSyncCheck);
+videoElement.addEventListener("pause", stopSyncCheck);
+
+// --- SponsorBlock skip fix
+let sponsorSkipInProgress = false; // flag to track SB skip
+
+// Wrap SponsorBlock skips by listening for its events
+document.addEventListener("SponsorBlockSkip", () => {
+    sponsorSkipInProgress = true;
+    setTimeout(() => { sponsorSkipInProgress = false; }, 100); // short debounce
+});
 
 function playbackIntervention(event) {
-	console.log(event.target.tagName.toLowerCase(), event.type)
-	if (audio.src) {
-		let target = event.target
-		let other = (event.target === video ? audio : video)
-		let targetPlayManager = playManagers[target.tagName.toLowerCase()]
-		let otherPlayManager = playManagers[other.tagName.toLowerCase()]
-		if (ignoreNext[event.type] > 0) {
-			ignoreNext[event.type]--
-			return
-		}
-		switch (event.type) {
-		case "durationchange":
-			target.ready = false;
-			break;
-		case "seeked":
-			target.ready = false;
-			target.pause();
-			other.currentTime = target.currentTime;
-			break;
-		case "play":
-			other.currentTime = target.currentTime;
-			otherPlayManager.play();
-			break;
-		case "pause":
-			other.currentTime = target.currentTime;
-			other.pause();
-		case "playing":
-			other.currentTime = target.currentTime;
-			break;
-		case "ratechange":
-			other.playbackRate = target.playbackRate;
-			break;
-		// case "stalled":
-		// case "waiting":
-			// target.pause();
-			// break;
-		}
-	} else {
-		// @ts-ignore this does exist
-		// if (event.type == "canplaythrough" && !video.manualPaused) video.play();
-	}
+    const target = event.target;
+    const other = target === videoElement ? audioElement : videoElement;
+
+    // Only sync audio for non-SB manual seeks
+    if (!sponsorSkipInProgress && audioElement.src && !ignoreNext[event.type]--) {
+        if (event.type === "seeked") {
+            const targetTime = target.currentTime;
+            other.currentTime = targetTime;
+
+            setTimeout(() => {
+                if (Math.abs(videoElement.currentTime - audioElement.currentTime) > 0.1) {
+                    videoElement.currentTime = targetTime;
+                    audioElement.currentTime = targetTime;
+                }
+            }, 100);
+        } else if (event.type === "play") {
+            playManagers[other.tagName.toLowerCase()].play();
+        } else if (event.type === "pause") {
+            other.pause();
+        } else if (event.type === "ratechange") {
+            other.playbackRate = target.playbackRate;
+        }
+    }
 }
 
-for (let eventName of ["pause", "play", "seeked"]) {
-	video.addEventListener(eventName, playbackIntervention)
+function debounce(func, wait) {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func(...args), wait);
+    };
 }
-for (let eventName of ["canplaythrough", "waiting", "stalled", "ratechange"]) {
-	video.addEventListener(eventName, playbackIntervention)
-	audio.addEventListener(eventName, playbackIntervention)
-}
+
+const debouncedPlaybackIntervention = debounce(playbackIntervention, 100);
+["pause", "play", "seeked"].forEach(eventName =>
+    videoElement.addEventListener(eventName, debouncedPlaybackIntervention)
+);
+["canplaythrough", "waiting", "stalled", "ratechange"].forEach(eventName => {
+    videoElement.addEventListener(eventName, playbackIntervention);
+    audioElement.addEventListener(eventName, playbackIntervention);
+});
+
+// Error handling
+videoElement.addEventListener("error", (e) => {
+    console.error("Video loading error:", e);
+});
+audioElement.addEventListener("error", (e) => {
+    console.error("Audio loading error:", e);
+});
+
+// Loading feedback
+videoElement.addEventListener("waiting", () => console.log("Video buffering..."));
+audioElement.addEventListener("waiting", () => console.log("Audio buffering..."));
+
+// Fix reverb on buffering mid-playback
+// --- Robust mid-playback buffering isolation ---
+let wasPlayingBeforeBuffer = false;
+
+videoElement.addEventListener("waiting", () => {
+    if (!videoElement.paused && videoElement.currentTime > 0) {
+        wasPlayingBeforeBuffer = true;
+
+        if (!audioElement.paused && formatLoader.npa) {
+            audioElement.muted = true;
+        }
+    }
+});
+
+videoElement.addEventListener("playing", () => {
+    if (wasPlayingBeforeBuffer && formatLoader.npa) {
+        wasPlayingBeforeBuffer = false;
+        audioElement.muted = false;
+        audioElement.currentTime = videoElement.currentTime;
+    }
+});
+
+
+const videoObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            loadMediaWithRetry(videoElement, formatLoader.npv.url);
+            if (formatLoader.npa) {
+                loadMediaWithRetry(audioElement, formatLoader.npa.url);
+            }
+            videoObserver.disconnect();
+        }
+    });
+}, { threshold: 0.5 });
+
+videoObserver.observe(videoElement);
 
 function relativeSeek(seconds) {
-	video.currentTime += seconds
+    videoElement.currentTime += seconds;
 }
 
-function playVideo() {
-	audio.currentTime = video.currentTime
-	let lastTime = video.currentTime
-	ignoreNext.play++
-	video.play().then(() => {
-		const interval = setInterval(() => {
-			console.log("checking video", video.currentTime, lastTime)
-			if (video.currentTime !== lastTime) {
-				clearInterval(interval)
-				playManagers.audio.play()
-				return
-			}
-		}, 15)
-	})
+async function playVideo() {
+    if (!userInteracted) return; // ðŸ”´ prevent auto play before click/gesture
+    if (!videoElement.paused) return;
+
+    audioElement.currentTime = videoElement.currentTime;
+    ignoreNext.play++;
+
+    try {
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
+        await videoElement.play();
+        if (playManagers.audio.isActive() && audioElement.src) {
+            await audioElement.play();
+        }
+    } catch (e) {
+        console.error("Video play failed", e);
+    }
 }
 
 function togglePlaying() {
-	if (video.paused) playVideo()
-	else video.pause()
+    if (videoElement.paused) {
+        playVideo();
+    } else {
+        videoElement.pause();
+    }
 }
 
 function toggleFullScreen() {
-	if (document.fullscreen) document.exitFullscreen()
-	else video.requestFullscreen()
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+        (videoElement.requestFullscreen || videoElement.webkitRequestFullscreen).call(videoElement);
+    }
 }
 
-video.addEventListener("click", event => {
-	event.preventDefault()
-	togglePlaying()
-})
+// ðŸ”´ Critical: Track interaction and refocus
+videoElement.addEventListener("pointerdown", () => {
+    videoElement.focus();
+});
 
-video.addEventListener("dblclick", event => {
-	event.preventDefault()
-	toggleFullScreen()
-})
+videoElement.addEventListener("click", (event) => {
+    event.preventDefault();
+    togglePlaying();
+    videoElement.lastInteraction = Date.now(); // Track last click
+    videoElement.focus();
+});
 
-document.addEventListener("keydown", event => {
-	if (["INPUT", "SELECT", "BUTTON"].includes(event.target.tagName)) return
-	if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return
-	let caught = true
-	if (event.key === "j" || event.key === "n") {
-		relativeSeek(-10)
-	} else if (["k", "p", " ", "e"].includes(event.key)) {
-		togglePlaying()
-	} else if (event.key === "l" || event.key === "o") {
-		relativeSeek(10)
-	} else if (event.key === "ArrowLeft") {
-		relativeSeek(-5)
-	} else if (event.key === "ArrowRight") {
-		relativeSeek(5)
-	} else if (event.key >= "0" && event.key <= "9") {
-		video.currentTime = video.duration * (+event.key) / 10
-	} else if (event.key === "f") {
-		toggleFullScreen()
-	} else {
-		caught = false
-	}
-	if (caught) event.preventDefault()
-})
+// âœ… Capture spacebar early and forcefully
+const keyActions = new Map([
+    ["j", () => relativeSeek(-10)],
+    ["n", () => relativeSeek(-10)],
+    ["k", togglePlaying],
+    ["p", togglePlaying],
+    [" ", togglePlaying],
+    ["e", togglePlaying],
+    ["l", () => relativeSeek(10)],
+    ["o", () => relativeSeek(10)],
+    ["ArrowLeft", () => relativeSeek(-5)],
+    ["ArrowRight", () => relativeSeek(5)],
+    ["f", toggleFullScreen]
+]);
 
-new SubscribeButton(q("#subscribe"))
+// Use capture phase to intercept spacebar before browser scrolls
+document.addEventListener("keydown", async (event) => {
+    // Ignore inputs and Ctrl combinations
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(event.target.tagName) || event.ctrlKey) {
+        return;
+    }
 
-const timestamps = qa("[data-clickable-timestamp]")
+    if (event.key === "k") {
+        event.preventDefault();
 
-class Timestamp extends ElemJS {
-	constructor(element) {
-		super(element)
-		this.on("click", this.onClick.bind(this))
-	}
+        // Track last interaction so other logic (like spacebar) sees a gesture
+        videoElement.lastInteraction = Date.now();
 
-	onClick(event) {
-		event.preventDefault()
-		video.currentTime = event.target.getAttribute("data-clickable-timestamp")
-		window.history.replaceState(null, "", event.target.href)
-	}
+        // Attempt to play video and audio
+        try {
+            if (videoElement.paused) {
+                await videoElement.play(); // counts as user gesture
+                if (audioElement.src && playManagers.audio.isActive()) {
+                    try {
+                        await audioElement.play();
+                    } catch (e) {
+                        console.warn("Audio blocked until user gesture:", e);
+                    }
+                }
+            } else {
+                videoElement.pause();
+                audioElement.pause();
+            }
+        } catch (e) {
+            console.warn("Playback blocked by browser:", e);
+        }
+
+        return; // prevent further handling
+    }
+
+    const action = keyActions.get(event.key);
+    if (action) {
+        if (event.key === " ") {
+            const isActive = document.activeElement === videoElement;
+            const recentlyClicked = Date.now() - (videoElement.lastInteraction || 0) < 15000;
+            if (!isActive && !recentlyClicked) return;
+            event.preventDefault();
+        }
+
+        action();
+        event.preventDefault();
+    }
+}, true); // capture phase: critical for gesture detection
+
+
+if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'Video Title',
+        artist: 'Artist Name',
+        album: 'Album Name',
+    });
+
+    navigator.mediaSession.setActionHandler('play', togglePlaying);
+    navigator.mediaSession.setActionHandler('pause', togglePlaying);
 }
 
-timestamps.forEach(el => {
-	new Timestamp(el)
-})
+videoElement.setAttribute('preload', 'metadata');
+audioElement.setAttribute('preload', 'metadata');
+
+new SubscribeButton(q("#subscribe"));
+
+document.addEventListener('click', (event) => {
+    const timestampEl = event.target.closest('[data-clickable-timestamp]');
+    if (timestampEl) {
+        event.preventDefault();
+        const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+        if (!isNaN(time)) {
+            videoElement.currentTime = time;
+            window.history.replaceState(null, '', timestampEl.href);
+        }
+    }
+});
