@@ -94,7 +94,11 @@ function rewriteVideoDescription(descriptionHtml, id) {
 		params.set("t", timeURL)
 		const url = "/watch?" + params
 
-		return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds})
+		// Ensure the data-clickable-timestamp attribute contains a plain
+		// numeric string (seconds). Passing a string avoids cases where the
+		// attribute could contain formats like "3:00" or "3m00s" which
+		// front-end parseFloat would misinterpret (e.g. parseFloat("3:00") === 3).
+		return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds: String(timeSeconds)})
 	})
 
 	return descriptionHtml

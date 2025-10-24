@@ -1,4 +1,4 @@
-import {q, qa, ElemJS} from "./elemjs/elemjs.js"
+import {q, ElemJS} from "./elemjs/elemjs.js"
 
 class Chapter {
 	constructor(linkElement) {
@@ -7,17 +7,9 @@ class Chapter {
 	}
 }
 
-let chapters = [...document.querySelectorAll("[data-clickable-timestamp]")].map(linkElement => new Chapter(linkElement))
+let chapters = [...document.querySelectorAll("[data-clickable-timestamp]")]
+    .map(el => new Chapter(el))
 chapters.sort((a, b) => a.time - b.time)
-
-function getCurrentChapter(time) {
-	const candidates = chapters.filter(chapter => chapter.time <= time)
-	if (candidates.length > 0) {
-		return candidates[candidates.length - 1]
-	} else {
-		return null
-	}
-}
 
 const video = q("#video")
 const description = q("#description")
@@ -25,29 +17,48 @@ const regularBackground = "var(--regular-background)"
 const highlightBackground = "var(--highlight-background)"
 const paddingWidth = 4
 let lastChapter = null
-setInterval(() => {
-	const currentChapter = getCurrentChapter(video.currentTime)
 
+function getCurrentChapter(time) {
+	const candidates = chapters.filter(ch => ch.time <= time)
+	return candidates.length ? candidates[candidates.length - 1] : null
+}
+
+function updateHighlight() {
+	const currentChapter = getCurrentChapter(video.currentTime)
 	if (currentChapter !== lastChapter) {
-		// Style link
-		if (lastChapter) {
-			lastChapter.link.removeClass("timestamp--active")
-		}
+		if (lastChapter) lastChapter.link.removeClass("timestamp--active")
+		//if (currentChapter) currentChapter.link.addClass("timestamp--active")
+
 		if (currentChapter) {
-			currentChapter.link.class("timestamp--active")
-		}
-		// Style background
-		if (currentChapter) {
-			const {offsetTop, offsetHeight} = currentChapter.link.element;
+			const {offsetTop, offsetHeight} = currentChapter.link.element
 			const offsetBottom = offsetTop + offsetHeight
-			let gradient = `linear-gradient(to bottom,`
-				+ ` ${regularBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetTop - paddingWidth}px,`
-				+ ` ${highlightBackground} ${offsetBottom + paddingWidth}px, ${regularBackground} ${offsetBottom + paddingWidth}px)`
-			console.log(gradient)
-			description.style.background = gradient
+			description.style.background =
+				`linear-gradient(to bottom, ${regularBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetBottom + paddingWidth}px, ${regularBackground} ${offsetBottom + paddingWidth}px)`
 		} else {
 			description.style.background = ""
 		}
+		lastChapter = currentChapter
 	}
-	lastChapter = currentChapter
-}, 1000)
+}
+
+setInterval(updateHighlight, 250)
+
+document.addEventListener('click', e => {
+	const timestampEl = e.target.closest('[data-clickable-timestamp]')
+	if (!timestampEl) return
+
+	e.preventDefault()
+	const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'))
+	if (isNaN(time)) return
+
+	video.currentTime = time
+
+	// Convert seconds to YouTube-style t=XmYs
+	const minutes = Math.floor(time / 60)
+	const seconds = Math.floor(time % 60)
+	const tParam = `${minutes}m${seconds}s`
+
+	const url = new URL(window.location)
+	url.searchParams.set('t', tParam)
+	window.history.replaceState(null, '', url)
+})
