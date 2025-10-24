@@ -89,27 +89,27 @@ function isValidUrl(string) {
 
 function loadMediaWithRetry(mediaElement, url, retries = 6) {
     let attempt = 0;
-    let locked = false; // lock once playback ever begins
+    let locked = false;
+    let reloading = false; // prevent rapid reload loops
 
     const load = () => {
-        if (locked) return; // never reload after playback has started
+        if (locked || reloading) return;
+        reloading = true;
+
+        // prevent immediate consecutive reloads
+        setTimeout(() => { reloading = false; }, 3000);
+
+        // if element already has usable buffered data, skip reload
+        if (mediaElement.readyState >= 3 && !mediaElement.error) return;
 
         mediaElement.src = url;
         mediaElement.load();
 
-        // Lock out retries once playback begins
-        mediaElement.onplaying = () => {
-            locked = true;
-        };
-
-        mediaElement.oncanplay = () => {
-            // Also lock out once itâ€™s ready to play (in case play() isnâ€™t called yet)
-            locked = true;
-        };
+        mediaElement.onplaying = () => { locked = true; };
+        mediaElement.oncanplay = () => { locked = true; };
 
         mediaElement.onerror = () => {
-            if (locked) return; // ignore errors after lock
-
+            if (locked) return;
             attempt++;
             if (attempt < retries) {
                 setTimeout(load, 4000 * attempt);
@@ -275,6 +275,9 @@ function playbackIntervention(event) {
     const target = event.target;
     const other = target === videoElement ? audioElement : videoElement;
 
+    // Prevent race while media is buffering or not ready
+    if (target.readyState < 2) return;
+
     // Only sync audio for non-SB manual seeks
     if (!sponsorSkipInProgress && audioElement.src && !ignoreNext[event.type]--) {
         if (event.type === "seeked") {
@@ -288,7 +291,9 @@ function playbackIntervention(event) {
                 }
             }, 100);
         } else if (event.type === "play") {
-            playManagers[other.tagName.toLowerCase()].play();
+            if (other.readyState >= 2) {
+                playManagers[other.tagName.toLowerCase()].play();
+            }
         } else if (event.type === "pause") {
             other.pause();
         } else if (event.type === "ratechange") {
@@ -368,11 +373,13 @@ function relativeSeek(seconds) {
 }
 
 async function playVideo() {
-    if (!userInteracted) return; // ðŸ”´ prevent auto play before click/gesture
+    if (!userInteracted) return;
     if (!videoElement.paused) return;
 
     audioElement.currentTime = videoElement.currentTime;
-    ignoreNext.play++;
+
+    // stop the "play/pause fight" loop
+    ignoreNext.play = 2;
 
     try {
         if (audioContext.state === 'suspended') {
@@ -380,8 +387,13 @@ async function playVideo() {
         }
 
         await videoElement.play();
+
         if (playManagers.audio.isActive() && audioElement.src) {
-            await audioElement.play();
+            try {
+                await audioElement.play();
+            } catch (e) {
+                console.warn("Audio blocked until user gesture:", e);
+            }
         }
     } catch (e) {
         console.error("Video play failed", e);
@@ -404,8 +416,9 @@ function toggleFullScreen() {
     }
 }
 
-// ðŸ”´ Critical: Track interaction and refocus
+// 🔴 Critical: Track interaction and refocus
 videoElement.addEventListener("pointerdown", () => {
+    userInteracted = true
     videoElement.focus();
 });
 
@@ -416,7 +429,7 @@ videoElement.addEventListener("click", (event) => {
     videoElement.focus();
 });
 
-// âœ… Capture spacebar early and forcefully
+// ✅ Capture spacebar early and forcefully
 const keyActions = new Map([
     ["j", () => relativeSeek(-10)],
     ["n", () => relativeSeek(-10)],
