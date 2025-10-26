@@ -93,7 +93,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
     let reloading = false; // prevent rapid reload loops
 
     const load = () => {
-        if (locked || reloading) return;
+        if (locked && reloading) return;
         reloading = true;
 
         // prevent immediate consecutive reloads
@@ -109,6 +109,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
         mediaElement.oncanplay = () => { locked = true; };
 
         mediaElement.onerror = () => {
+            reloading = false;
             if (locked) return;
             attempt++;
             if (attempt < retries) {
