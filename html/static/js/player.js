@@ -25,6 +25,14 @@ const audioFormats = [];
     }
 });
 
+// Update src from initial url page load
+try {
+    const src = videoElement.querySelector('source')?.src
+    const itag = videoElement.dataset.itag
+    const vf = itag && videoFormats.get(itag)
+    if (vf && src) vf.url = src
+} catch {}
+
 function getBestAudioFormat() {
     function parseXtags(url) {
         const urlParams = new URLSearchParams(url.split('?')[1] ?? '');
