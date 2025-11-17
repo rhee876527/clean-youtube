@@ -165,6 +165,18 @@ class FormatLoader {
     constructor() {
         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
         this.npa = null;
+
+        // --- FIX: attach best audio on initial load if video has no audio ---
+        const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
+        if (!hasAudio) {
+            const bestAudio = getBestAudioFormat();
+            if (bestAudio) {
+                this.npa = bestAudio;
+            }
+        }
+
+        // Load media immediately
+        requestAnimationFrame(() => this.update());
     }
 
     play(itag, isQualitySwitch = false) {
@@ -182,11 +194,9 @@ class FormatLoader {
         this.update(isQualitySwitch);
     }
 
-
     update(isQualitySwitch = false) {
         cleanupSync();
 
-        // Use currentTime only if >0, otherwise let URL seek apply
         const lastTime = isQualitySwitch ? videoElement.currentTime : null;
 
         if (!this.npv.url) {
@@ -195,7 +205,6 @@ class FormatLoader {
         }
 
         if (isQualitySwitch) {
-
             videoElement.pause();
             stopSyncCheck();
 
@@ -247,6 +256,7 @@ class FormatLoader {
         }
     }
 }
+
 
 const formatLoader = new FormatLoader();
 
