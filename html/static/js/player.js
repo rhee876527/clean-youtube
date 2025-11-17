@@ -287,16 +287,16 @@ const playManagers = {
 class QualitySelect extends ElemJS {
     constructor() {
         super(q("#quality-select"));
-        const saved = localStorage.getItem("lastQuality");
-        if (saved) this.element.value = saved;
-        this.on("input", this.setFormat.bind(this));
         this.initialized = false;
 
-        // Defer initial format activation until the browser applies &t=
+        // Defer until DOM & videoFormats ready
         requestAnimationFrame(() => {
-            this.initialized = true;
+            const saved = localStorage.getItem("lastQuality");
 
-            if (saved) {
+            // Only set value if the option exists
+            if (saved && this.element.querySelector(`option[value="${saved}"]`)) {
+                this.element.value = saved;
+
                 if (videoElement.readyState >= 1) {
                     formatLoader.play(saved, true);
                 } else {
@@ -305,9 +305,12 @@ class QualitySelect extends ElemJS {
                     }, { once: true });
                 }
             }
-        });
-    }
 
+            this.initialized = true;
+        });
+
+        this.on("input", this.setFormat.bind(this));
+    }
 
     setFormat() {
         if (!this.initialized) return;
