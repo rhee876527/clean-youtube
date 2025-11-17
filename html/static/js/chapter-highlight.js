@@ -24,6 +24,7 @@ function getCurrentChapter(time) {
 }
 
 function updateHighlight() {
+	if (!video) return
 	const currentChapter = getCurrentChapter(video.currentTime)
 	if (currentChapter !== lastChapter) {
 		if (lastChapter) lastChapter.link.removeClass("timestamp--active")
