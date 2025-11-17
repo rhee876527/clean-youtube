@@ -472,19 +472,25 @@ async function playVideo() {
     if (!userInteracted) return;
     if (!videoElement.paused) return;
 
-    audioElement.currentTime = videoElement.currentTime;
+    const targetTime = videoElement.currentTime;
+    audioElement.currentTime = targetTime;
     ignoreNext.play = 2;
 
     try {
         if (audioContext.state === 'suspended') await audioContext.resume();
-        await videoElement.play();
 
-        if (playManagers.audio.isActive() && audioElement.src) {
+        // Only play video immediately if no separate audio, otherwise wait for audio
+        if (!formatLoader.npa) {
+            await videoElement.play();
+        } else {
+            // Wait until audio can play
             if (audioElement.readyState >= 2) {
                 await audioElement.play();
+                await videoElement.play();
             } else {
                 audioElement.addEventListener('canplaythrough', async () => {
-                    if (!audioElement.paused) await audioElement.play();
+                    await audioElement.play();
+                    await videoElement.play();
                 }, { once: true });
             }
         }
