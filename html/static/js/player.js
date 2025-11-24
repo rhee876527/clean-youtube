@@ -610,14 +610,24 @@ audioElement.setAttribute('preload', 'metadata');
 
 new SubscribeButton(q("#subscribe"));
 
+let userSeeking = false;
 document.addEventListener('click', (event) => {
-    const timestampEl = event.target.closest('[data-clickable-timestamp]');
-    if (timestampEl) {
-        event.preventDefault();
-        const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
-        if (!isNaN(time)) {
-            videoElement.currentTime = time;
-            window.history.replaceState(null, '', timestampEl.href);
-        }
-    }
+  const timestampEl = event.target.closest('[data-clickable-timestamp]');
+  if (!timestampEl) return;
+
+  event.preventDefault();
+  const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+  if (isNaN(time)) return;
+
+  // This single line stops the play/pause buffering loop
+  userSeeking = true;
+
+  videoElement.currentTime = time;
+  if (formatLoader.npa) audioElement.currentTime = time;
+
+  window.history.replaceState(null, '', timestampEl.href);
+
+  // Clear flag after seek settles
+  videoElement.addEventListener('seeked', () =>
+    setTimeout(() => userSeeking = false, 300), { once: true });
 });
