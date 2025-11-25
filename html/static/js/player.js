@@ -2,6 +2,7 @@ import { q, qa, ElemJS } from "/static/js/elemjs/elemjs.js";
 import { SubscribeButton } from "/static/js/modules/SubscribeButton.js";
 
 const videoElement = q("#video");
+videoElement.setAttribute("fetchpriority", "high");
 const audioElement = q("#audio");
 // Buffer audio aggressively
 audioElement.preload = "auto";
@@ -95,18 +96,23 @@ function isValidUrl(string) {
     }
 }
 
+function warmup(url) {
+    try {
+        const origin = new URL(url).origin;
+        const link = document.createElement("link");
+        link.rel = "preconnect";
+        link.href = origin;
+        document.head.appendChild(link);
+    } catch {}
+}
+
 function loadMediaWithRetry(mediaElement, url, retries = 6) {
     let attempt = 0;
     let locked = false;
-    let reloading = false;
 
-    const load = () => {
-        if (locked && reloading) return;
-        reloading = true;
-
-        setTimeout(() => { reloading = false; }, 3000);
-
-        if (mediaElement.readyState >= 3 && !mediaElement.error) return;
+    function tryLoad() {
+        // warm up connection BEFORE requesting the media
+        warmup(url);
 
         mediaElement.src = url;
         mediaElement.load();
@@ -115,21 +121,21 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
         mediaElement.oncanplay = () => { locked = true; };
 
         mediaElement.onerror = () => {
-            reloading = false;
             if (locked) return;
             attempt++;
-            console.error("Audio load failed:", url);
+            console.error("Media load failed:", url);
+
             if (attempt < retries) {
-                setTimeout(load, 4000 * attempt);
+                setTimeout(tryLoad, 1000 * attempt); // gradual backoff, same logic, faster start
             } else {
                 console.error("Failed to load media after", retries, "attempts.");
             }
         };
-    };
+    }
 
-    // Start immediately; your play logic will guard actual playback
-    load();
+    tryLoad();
 }
+
 
 let pipReady = false;
 
