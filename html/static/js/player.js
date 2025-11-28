@@ -455,6 +455,42 @@ videoElement.addEventListener("playing", () => {
     }
 });
 
+// --- Robust smooth seek for separate audio/video ---
+let freezePlayback = false
+let shouldResume = false
+
+videoElement.addEventListener("seeking", () => {
+    freezePlayback = true
+    if (!videoElement.paused || (formatLoader.npa && !audioElement.paused)) {
+        shouldResume = true
+        videoElement.pause()
+        if (formatLoader.npa) audioElement.pause()
+    }
+})
+
+function resumeWhenBuffered() {
+    if (!freezePlayback || !shouldResume) return
+
+    const videoReady = videoElement.readyState >= 3
+    const audioReady = !formatLoader.npa || audioElement.readyState >= 3
+
+    if (videoReady && audioReady) {
+        freezePlayback = false
+        shouldResume = false
+        const t = videoElement.currentTime
+        if (formatLoader.npa) audioElement.currentTime = t
+        videoElement.play().catch(()=>{})
+        if (formatLoader.npa) audioElement.play().catch(()=>{})
+    } else {
+        // Retry shortly until both ready
+        requestAnimationFrame(resumeWhenBuffered)
+    }
+}
+
+videoElement.addEventListener("seeking", () => {
+    requestAnimationFrame(resumeWhenBuffered)
+})
+
 
 const videoObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
