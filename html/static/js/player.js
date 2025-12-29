@@ -2,16 +2,17 @@ import { q, qa, ElemJS } from "/static/js/elemjs/elemjs.js";
 import { SubscribeButton } from "/static/js/modules/SubscribeButton.js";
 
 const videoElement = q("#video");
-videoElement.setAttribute("fetchpriority", "high");
+videoElement.setAttribute("fetchpriority", "low");
 const audioElement = q("#audio");
 // Buffer audio aggressively
+audioElement.setAttribute("fetchpriority", "high");
 audioElement.preload = "auto";
 
 // Make video focusable
 videoElement.setAttribute("tabindex", "0");
 
 let userInteracted = false;
-document.addEventListener("click", () => { userInteracted = true; }, { once: true });
+document.addEventListener("click", () => { userInteracted = true; alignStreams(); }, { once: true });
 
 let syncCheckInterval = null;
 const videoFormats = new Map();
@@ -134,6 +135,13 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
     }
 
     tryLoad();
+}
+
+function alignStreams() {
+    if (!audioElement.src || !videoElement.src) return;
+    const t = Math.max(audioElement.currentTime || 0, videoElement.currentTime || 0);
+    audioElement.currentTime = t;
+    videoElement.currentTime = t;
 }
 
 
