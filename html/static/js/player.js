@@ -27,6 +27,10 @@ const audioFormats = [];
     }
 });
 
+// --- pre-warm all known origins ---
+videoFormats.forEach(vf => warmup(vf.url));
+audioFormats.forEach(af => warmup(af.url));
+
 // Update src from initial url page load
 try {
     const src = videoElement.querySelector('source')?.src
@@ -97,13 +101,26 @@ function isValidUrl(string) {
     }
 }
 
+const warmedOrigins = new Set();
+
 function warmup(url) {
     try {
         const origin = new URL(url).origin;
-        const link = document.createElement("link");
-        link.rel = "preconnect";
-        link.href = origin;
-        document.head.appendChild(link);
+        if (warmedOrigins.has(origin)) return; // already done
+        warmedOrigins.add(origin);
+
+        // Preconnect: TCP + TLS
+        const preconnectLink = document.createElement("link");
+        preconnectLink.rel = "preconnect";
+        preconnectLink.href = origin;
+        document.head.appendChild(preconnectLink);
+
+        // DNS prefetch
+        const dnsLink = document.createElement("link");
+        dnsLink.rel = "dns-prefetch";
+        dnsLink.href = origin;
+        document.head.appendChild(dnsLink);
+
     } catch {}
 }
 
