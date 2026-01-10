@@ -390,15 +390,6 @@ function cleanupSync() {
 videoElement.addEventListener("play", startSyncCheck);
 videoElement.addEventListener("pause", stopSyncCheck);
 
-// --- SponsorBlock skip fix
-let sponsorSkipInProgress = false; // flag to track SB skip
-
-// Wrap SponsorBlock skips by listening for its events
-document.addEventListener("SponsorBlockSkip", () => {
-    sponsorSkipInProgress = true;
-    setTimeout(() => { sponsorSkipInProgress = false; }, 100); // short debounce
-});
-
 function playbackIntervention(event) {
     const target = event.target;
     const other = target === videoElement ? audioElement : videoElement;
@@ -407,7 +398,7 @@ function playbackIntervention(event) {
     if (target.readyState < 2) return;
 
     // Only sync audio for non-SB manual seeks
-    if (!sponsorSkipInProgress && audioElement.src && !ignoreNext[event.type]--) {
+    if (audioElement.src && !ignoreNext[event.type]--) {
         if (event.type === "seeked") {
             const targetTime = target.currentTime;
             other.currentTime = targetTime;
