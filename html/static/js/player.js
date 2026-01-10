@@ -226,6 +226,7 @@ class FormatLoader {
     }
 
     update(isQualitySwitch = false) {
+        if (!userInteracted) return;
         cleanupSync();
 
         const lastTime = isQualitySwitch ? videoElement.currentTime : null;
@@ -569,9 +570,11 @@ async function playVideo() {
 
 function togglePlaying() {
     if (videoElement.paused) {
+        if (!userInteracted) return;
         playVideo();
     } else {
         videoElement.pause();
+        if (formatLoader.npa) audioElement.pause(); // also pause separate audio
     }
 }
 
