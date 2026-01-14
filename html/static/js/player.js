@@ -524,7 +524,9 @@ const videoObserver = new IntersectionObserver((entries) => {
 videoObserver.observe(videoElement);
 
 function relativeSeek(seconds) {
-    videoElement.currentTime += seconds;
+    const t = videoElement.currentTime + seconds;
+    videoElement.currentTime = t;
+    if (formatLoader.npa) audioElement.currentTime = t;
 }
 
 async function playVideo() {
