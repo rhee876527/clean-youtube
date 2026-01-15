@@ -364,22 +364,23 @@ new QualitySelect();
 const ignoreNext = { play: 0 };
 
 function startSyncCheck() {
-    if (syncCheckInterval) clearInterval(syncCheckInterval);
-
-    // Only start syncing if audio is ready or thereâ€™s no separate audio
+    // Only start syncing if audio is ready or there’s no separate audio
     if (formatLoader.npa && audioElement.readyState < 2) {
         audioElement.addEventListener('canplaythrough', startSyncCheck, { once: true });
         return;
     }
 
-    syncCheckInterval = setInterval(() => {
+    const sync = () => {
         if (!videoElement.paused && !audioElement.paused) {
             const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
             if (drift > 0.1) {
                 audioElement.currentTime = videoElement.currentTime;
             }
         }
-    }, 1000);
+    };
+
+    videoElement.removeEventListener('timeupdate', sync);
+    videoElement.addEventListener('timeupdate', sync);
 }
 
 function stopSyncCheck() {
