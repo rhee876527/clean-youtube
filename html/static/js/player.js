@@ -618,6 +618,13 @@ videoElement.addEventListener("click", (event) => {
     videoElement.focus();
 });
 
+videoElement.addEventListener("seeked", () => {
+    if (formatLoader.npa) {
+        audioElement.muted = false;
+        audioElement.currentTime = videoElement.currentTime;
+    }
+});
+
 // âœ… Capture spacebar early and forcefully
 const keyActions = new Map([
     ["j", () => relativeSeek(-10)],
