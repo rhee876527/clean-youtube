@@ -486,12 +486,9 @@ videoElement.addEventListener("seeking", () => {
 })
 
 function resumeWhenBuffered() {
-    if (!freezePlayback || !shouldResume) return
+    if (!freezePlayback || !shouldResume) return;
 
-    const videoReady = videoElement.readyState >= 3
-    const audioReady = !formatLoader.npa || audioElement.readyState >= 3
-
-    if (videoReady && audioReady) {
+    if (videoElement.readyState >= 2 && (!formatLoader.npa || audioElement.readyState >= 2)) {
         freezePlayback = false
         shouldResume = false
         const t = videoElement.currentTime
@@ -499,7 +496,6 @@ function resumeWhenBuffered() {
         videoElement.play().catch(()=>{})
         if (formatLoader.npa) audioElement.play().catch(()=>{})
     } else {
-        // Retry shortly until both ready
         requestAnimationFrame(resumeWhenBuffered)
     }
 }
@@ -592,10 +588,12 @@ videoElement.addEventListener("click", (event) => {
     videoElement.focus();
 });
 
-videoElement.addEventListener("seeked", () => {
-    if (formatLoader.npa) {
-        audioElement.muted = false;
-        audioElement.currentTime = videoElement.currentTime;
+videoElement.addEventListener("seeking", () => {
+    freezePlayback = true;
+    if (formatLoader.npa && !videoElement.paused) {
+        shouldResume = true;
+        videoElement.pause();
+        audioElement.pause();
     }
 });
 
