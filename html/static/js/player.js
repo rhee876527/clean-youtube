@@ -425,6 +425,32 @@ function playbackIntervention(event) {
     }
 }
 
+async function waitForAudioThenPlay(videoEl, audioEl) {
+    if (!formatLoader.npa) {
+        // No separate audio, play video immediately
+        await videoEl.play();
+        return;
+    }
+
+    // Wait until audio has at least one buffered range
+    await new Promise(resolve => {
+        if (audioEl.buffered.length > 0) return resolve();
+
+        const check = () => {
+            if (audioEl.buffered.length > 0) return resolve();
+            requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+    });
+
+    // Sync times
+    audioEl.currentTime = videoEl.currentTime;
+
+    // Attempt playback; browser may block until gesture
+    await audioEl.play().catch(() => {});
+    await videoEl.play();
+}
+
 function debounce(func, wait) {
     let timeoutId;
     return (...args) => {
@@ -480,29 +506,11 @@ videoElement.addEventListener("playing", () => {
 let freezePlayback = false
 let shouldResume = false
 
-videoElement.addEventListener("seeking", () => {
+videoElement.addEventListener("seeking", async (event) => {
     // --- New: delay video naturally if audio is ahead ---
     if (formatLoader.npa) {
         const targetTime = videoElement.currentTime;
-
-        const waitAudio = () => {
-            if (audioElement.buffered.length > 0) {
-                // Find the buffered range containing targetTime
-                let start = audioElement.buffered.start(0);
-                for (let i = 0; i < audioElement.buffered.length; i++) {
-                    if (audioElement.buffered.start(i) <= targetTime && audioElement.buffered.end(i) >= targetTime) {
-                        start = audioElement.buffered.start(i);
-                        break;
-                    }
-                }
-
-                if (videoElement.currentTime < start) videoElement.currentTime = start;
-            } else {
-                requestAnimationFrame(waitAudio);
-            }
-        };
-
-        requestAnimationFrame(waitAudio);
+        await waitForAudioThenPlay(videoElement, audioElement);
     }
 
     // --- Existing freezePlayback logic remains untouched ---
@@ -564,31 +572,7 @@ async function playVideo() {
 
     try {
         if (audioContext.state === 'suspended') await audioContext.resume();
-
-        if (!formatLoader.npa) {
-            // No separate audio, play video immediately
-            await videoElement.play();
-        } else {
-            // Separate audio exists: wait for audio buffer before playing
-            const waitAudioReady = () => new Promise(resolve => {
-                if (audioElement.buffered.length > 0) return resolve();
-
-                const check = () => {
-                    if (audioElement.buffered.length > 0) return resolve();
-                    requestAnimationFrame(check);
-                };
-                requestAnimationFrame(check);
-            });
-
-            await waitAudioReady();
-
-            // Sync times again to be safe
-            audioElement.currentTime = videoElement.currentTime;
-
-            // Attempt playback; browser may block until gesture
-            await audioElement.play().catch(() => {});
-            await videoElement.play();
-        }
+        await waitForAudioThenPlay(videoElement, audioElement);
     } catch (e) {
         console.error("Playback failed:", e);
     }
@@ -718,7 +702,7 @@ new SubscribeButton(q("#subscribe"));
 
 let userSeeking = false;
 
-document.addEventListener('click', (event) => {
+document.addEventListener('click', async (event) => {
     const timestampEl = event.target.closest('[data-clickable-timestamp]');
     if (!timestampEl) return;
 
@@ -735,17 +719,7 @@ document.addEventListener('click', (event) => {
         audioElement.src = formatLoader.npa.url;
         audioElement.load();
         audioElement.currentTime = time;
-
-        // --- Natural delay: video cannot render past buffered audio ---
-        const waitForAudioBuffer = () => {
-            if (audioElement.buffered.length > 0) {
-                const start = audioElement.buffered.start(0);
-                if (videoElement.currentTime < start) videoElement.currentTime = start;
-            } else {
-                requestAnimationFrame(waitForAudioBuffer);
-            }
-        };
-        requestAnimationFrame(waitForAudioBuffer);
+        await waitForAudioThenPlay(videoElement, audioElement);
     }
 
     window.history.replaceState(null, '', timestampEl.href);
