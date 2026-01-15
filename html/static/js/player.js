@@ -426,6 +426,7 @@ function playbackIntervention(event) {
 }
 
 async function waitForAudioThenPlay(videoEl, audioEl) {
+    if (videoEl.paused === false) return;
     if (!formatLoader.npa) {
         // No separate audio, play video immediately
         await videoEl.play();
@@ -443,12 +444,28 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
         requestAnimationFrame(check);
     });
 
+    // Critical: re-check paused state after waiting — browser might have auto-paused or spam happened
+    if (!videoEl.paused) return;
+
     // Sync times
     audioEl.currentTime = videoEl.currentTime;
 
     // Attempt playback; browser may block until gesture
-    await audioEl.play().catch(() => {});
-    await videoEl.play();
+    try {
+        await audioEl.play();
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.warn("Audio play interrupted:", err);
+        }
+    }
+
+    try {
+        await videoEl.play();
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.warn("Video play interrupted:", err);
+        }
+    }
 }
 
 function debounce(func, wait) {
@@ -562,22 +579,28 @@ function relativeSeek(seconds) {
     if (formatLoader.npa) audioElement.currentTime = t;
 }
 
-async function playVideo() {
+// Near the top
+const debouncedPlayVideo = debounce(async () => {
     if (!userInteracted) return;
     if (!videoElement.paused) return;
 
-    const targetTime = videoElement.currentTime;
-    audioElement.currentTime = targetTime;
-    ignoreNext.play = 2;
-
     try {
         if (audioContext.state === 'suspended') await audioContext.resume();
-        await waitForAudioThenPlay(videoElement, audioElement);
-    } catch (e) {
-        console.error("Playback failed:", e);
-    }
-}
 
+        await waitForAudioThenPlay(videoElement, audioElement);
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            // Expected during rapid seeks — silent ignore
+            return;
+        }
+        console.error("Playback failed:", err);
+    }
+}, 100);
+
+// Then change playVideo to:
+async function playVideo() {
+    debouncedPlayVideo();
+}
 
 function togglePlaying() {
     if (videoElement.paused) {
