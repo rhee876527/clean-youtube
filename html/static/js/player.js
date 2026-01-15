@@ -289,8 +289,12 @@ class FormatLoader {
     }
 }
 
-
 const formatLoader = new FormatLoader();
+
+if (formatLoader.npa?.url) {
+    audioElement.src = formatLoader.npa.url;
+    audioElement.load();
+}
 
 class PlayManager {
     constructor(media, isAudio) {
@@ -679,23 +683,39 @@ audioElement.setAttribute('preload', 'metadata');
 new SubscribeButton(q("#subscribe"));
 
 let userSeeking = false;
+
 document.addEventListener('click', (event) => {
-  const timestampEl = event.target.closest('[data-clickable-timestamp]');
-  if (!timestampEl) return;
+    const timestampEl = event.target.closest('[data-clickable-timestamp]');
+    if (!timestampEl) return;
 
-  event.preventDefault();
-  const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
-  if (isNaN(time)) return;
+    event.preventDefault();
+    const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+    if (isNaN(time)) return;
 
-  // This single line stops the play/pause buffering loop
-  userSeeking = true;
+    userSeeking = true;
 
-  videoElement.currentTime = time;
-  if (formatLoader.npa) audioElement.currentTime = time;
+    // Set times
+    videoElement.currentTime = time;
 
-  window.history.replaceState(null, '', timestampEl.href);
+    if (formatLoader.npa?.url) {
+        audioElement.src = formatLoader.npa.url;
+        audioElement.load();
+        audioElement.currentTime = time;
 
-  // Clear flag after seek settles
-  videoElement.addEventListener('seeked', () =>
-    setTimeout(() => userSeeking = false, 300), { once: true });
+        // --- Natural delay: video cannot render past buffered audio ---
+        const waitForAudioBuffer = () => {
+            if (audioElement.buffered.length > 0) {
+                const start = audioElement.buffered.start(0);
+                if (videoElement.currentTime < start) videoElement.currentTime = start;
+            } else {
+                requestAnimationFrame(waitForAudioBuffer);
+            }
+        };
+        requestAnimationFrame(waitForAudioBuffer);
+    }
+
+    window.history.replaceState(null, '', timestampEl.href);
+
+    videoElement.addEventListener('seeked', () =>
+        setTimeout(() => userSeeking = false, 300), { once: true });
 });
