@@ -128,11 +128,7 @@ module.exports = [
 
 			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`)
 				.then(res => res.json())
-				.catch(err => {
-					console.error("Comments fetch failed:", err.code || err.message);
-					return {comments: []};
-				});
-
+				.catch(() => ({ comments: [] }));
 
 			try {
 				const video = await videoFuture;
