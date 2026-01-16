@@ -126,7 +126,13 @@ module.exports = [
 				? request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json())
 				: JSON.parse(new URLSearchParams(body.toString()).get("video"));
 
-			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`).then(res => res.json());
+			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`)
+				.then(res => res.json())
+				.catch(err => {
+					console.error("Comments fetch failed:", err.code || err.message);
+					return {comments: []};
+				});
+
 
 			try {
 				const video = await videoFuture;
