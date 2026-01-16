@@ -82,7 +82,28 @@ block content
 
         .description#description!= video.descriptionHtml
 
-      //- Standard view
+        .comments-section
+          h2.comments-header Comments
+          if comments && comments.length
+            .comments-list
+              each comment in comments
+                .comment-item(data-comment-id=comment.commentId)
+                  .comment-author-info
+                    a(href=comment.authorUrl class="comment-author")= comment.author
+                    if comment.verified
+                      .comment-verified ✓
+                    .comment-time= comment.publishedText
+                  .comment-text!= comment.contentHtml
+                  .comment-footer
+                    if comment.likeCount
+                      .comment-likes
+                        | 👍 #{comment.likeCount}
+                    if comment.replies && comment.replies.replyCount
+                      .comment-reply-count(data-continuation=comment.replies.continuation data-video-id=video.videoId data-reply-count=comment.replies.replyCount)= `${comment.replies.replyCount} ${comment.replies.replyCount === 1 ? 'reply' : 'replies'}`
+                  .comment-replies-container(style="display: none")
+          else
+            .no-comments Comments are disabled or unavailable for this video.
+      script(type="module" src=getStaticURL("html", "/static/js/comments.js"))
       aside(style=continuous ? "display: none" : "")#standard-related-videos.related-videos
         .related-cols
           h2.related-header Related videos

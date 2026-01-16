@@ -197,3 +197,145 @@ $_theme: () !default
 
 .fetch-status
   white-space: pre-wrap
+
+// Comments
+
+.comments-section
+  margin-top: 32px
+  margin-bottom: 32px
+
+  .comments-header
+    font-size: 1.2em
+    font-weight: bold
+    margin-bottom: 16px
+    color: map.get($_theme, "text-0")
+
+  .comments-list
+    display: flex
+    flex-direction: column
+    gap: 16px
+
+  .comment-item
+    padding: 12px
+    border-left: 3px solid map.get($_theme, "edge-grey")
+    background-color: map.get($_theme, "bg-4")
+
+    .comment-author-info
+      display: flex
+      gap: 8px
+      margin-bottom: 8px
+      align-items: center
+
+      .comment-author
+        font-weight: bold
+        text-decoration: none
+        color: map.get($_theme, "text-0")
+
+        &:hover
+          text-decoration: underline
+
+      .comment-time
+        font-size: 0.85em
+        color: map.get($_theme, "text-1")
+
+  .comment-text
+    margin: 8px 0
+    word-wrap: break-word
+    color: map.get($_theme, "text-0")
+
+    a
+      color: map.get($_theme, "link-color")
+      text-decoration: none
+
+      &:hover
+        text-decoration: underline
+
+  .comment-likes
+    display: flex
+    align-items: center
+    gap: 4px
+    font-size: 0.9em
+    color: map.get($_theme, "text-1")
+
+    .like-icon
+      opacity: 0.7
+
+  .comment-footer
+    display: flex
+    gap: 16px
+    align-items: center
+    margin-top: 8px
+
+  .comment-reply-count
+    font-size: 0.9em
+    color: map.get($_theme, "text-1")
+    cursor: pointer
+    padding: 4px 8px
+    border-radius: 4px
+    transition: background-color 0.2s
+
+    &:hover
+      background-color: map.get($_theme, "bg-3")
+
+  .comment-verified
+    color: #4a90e2
+    font-size: 0.9em
+    margin-left: 4px
+
+  .comment-replies-container
+    margin-top: 12px
+    margin-left: 16px
+    padding-left: 12px
+    border-left: 2px solid map.get($_theme, "edge-grey")
+
+    .nested-comments
+      display: flex
+      flex-direction: column
+      gap: 8px
+
+    .nested-comment-item
+      padding: 8px 0
+      border-bottom: 1px solid map.get($_theme, "edge-grey")
+
+      &:last-child
+        border-bottom: none
+
+    .nested-comment-author-info
+      display: flex
+      gap: 8px
+      align-items: center
+      margin-bottom: 4px
+      font-size: 0.95em
+
+      .nested-comment-author
+        font-weight: bold
+        text-decoration: none
+        color: map.get($_theme, "text-0")
+
+        &:hover
+          text-decoration: underline
+
+      .nested-comment-verified
+        color: #4a90e2
+        font-size: 0.9em
+
+      .nested-comment-time
+        font-size: 0.85em
+        color: map.get($_theme, "text-1")
+
+    .nested-comment-text
+      margin: 4px 0
+      word-wrap: break-word
+      color: map.get($_theme, "text-0")
+      font-size: 0.95em
+
+    .nested-comment-likes
+      font-size: 0.85em
+      color: map.get($_theme, "text-1")
+      margin-top: 4px
+
+  .no-comments
+    padding: 20px
+    text-align: center
+    color: map.get($_theme, "text-1")
+    background-color: map.get($_theme, "bg-4")

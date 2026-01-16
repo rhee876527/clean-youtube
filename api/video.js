@@ -126,8 +126,11 @@ module.exports = [
 				? request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json())
 				: JSON.parse(new URLSearchParams(body.toString()).get("video"));
 
+			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`).then(res => res.json());
+
 			try {
 				const video = await videoFuture;
+				const commentsData = await commentsFuture;
 				if (!video) throw new MessageError("The instance returned null.");
 				if (video.error) throw new InstanceError(video.error, video.identifier);
 
@@ -167,7 +170,7 @@ module.exports = [
 
 				return render(200, "pug/video.pug", {
 					req, url, video, formats, subscribed, instanceOrigin, mediaFragment, autoplay, continuous,
-					sessionWatched, sessionWatchedNext, settings
+					sessionWatched, sessionWatchedNext, settings, comments: commentsData.comments || []
 				});
 
 			} catch (error) {
@@ -181,6 +184,41 @@ module.exports = [
 				const message = render(0, `pug/errors/${errorType}.pug`, {instanceOrigin, error}).content;
 
 				return render(500, "pug/video.pug", {video: {videoId: id}, error: true, message, req, settings});
+			}
+		}
+	},
+	{
+		route: "/api/comments", methods: ["GET"], code: async ({req, url}) => {
+			const user = getUser(req);
+			const settings = user.getSettingsOrDefaults();
+			const videoId = url.searchParams.get("v");
+			const continuation = url.searchParams.get("continuation");
+
+			if (!videoId || !continuation) {
+				return {
+					statusCode: 400,
+					contentType: "application/json",
+					content: JSON.stringify({error: "Missing videoId or continuation"})
+				};
+			}
+
+			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
+
+			try {
+				const response = await request(`${instanceOrigin}/api/v1/comments/${videoId}?continuation=${encodeURIComponent(continuation)}`);
+				const data = await response.json();
+
+				return {
+					statusCode: 200,
+					contentType: "application/json",
+					content: JSON.stringify(data)
+				};
+			} catch (error) {
+				return {
+					statusCode: 500,
+					contentType: "application/json",
+					content: JSON.stringify({error: "Failed to fetch comments"})
+				};
 			}
 		}
 	}
