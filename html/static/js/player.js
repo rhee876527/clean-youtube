@@ -439,7 +439,12 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
         if (audioEl.buffered.length > 0) return resolve();
 
         const check = () => {
-            if (audioEl.buffered.length > 0) return resolve();
+            if (audioEl.buffered.length > 0) {
+                const audioEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
+                if (audioEnd - videoEl.currentTime >= 3) {
+                    return resolve();
+                }
+            }
             requestAnimationFrame(check);
         };
         requestAnimationFrame(check);
