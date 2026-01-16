@@ -1,0 +1,52 @@
+From 6778843e215a0130ebd0aae312d2756e6036ff15 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 24 Nov 2025 14:48:13 +0300
+Subject: [PATCH 13/31] more bug buffering fixes
+
+---
+ html/static/js/player.js | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index dbd8dba..e370be0 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -610,14 +610,24 @@ audioElement.setAttribute('preload', 'metadata');
+ 
+ new SubscribeButton(q("#subscribe"));
+ 
++let userSeeking = false;
+ document.addEventListener('click', (event) => {
+-    const timestampEl = event.target.closest('[data-clickable-timestamp]');
+-    if (timestampEl) {
+-        event.preventDefault();
+-        const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+-        if (!isNaN(time)) {
+-            videoElement.currentTime = time;
+-            window.history.replaceState(null, '', timestampEl.href);
+-        }
+-    }
+-});
++  const timestampEl = event.target.closest('[data-clickable-timestamp]');
++  if (!timestampEl) return;
++
++  event.preventDefault();
++  const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
++  if (isNaN(time)) return;
++
++  // This single line stops the play/pause buffering loop
++  userSeeking = true;
++
++  videoElement.currentTime = time;
++  if (formatLoader.npa) audioElement.currentTime = time;
++
++  window.history.replaceState(null, '', timestampEl.href);
++
++  // Clear flag after seek settles
++  videoElement.addEventListener('seeked', () =>
++    setTimeout(() => userSeeking = false, 300), { once: true });
++});
+\ No newline at end of file
+-- 
+2.52.0
+

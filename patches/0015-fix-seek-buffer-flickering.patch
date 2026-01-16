@@ -1,0 +1,59 @@
+From a46d7e803d9ec07ed3544a59307a4b008759e0b3 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 29 Nov 2025 00:11:40 +0300
+Subject: [PATCH 15/31] fix seek buffer flickering
+
+---
+ html/static/js/player.js | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 69e80e8..d172231 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -455,6 +455,42 @@ videoElement.addEventListener("playing", () => {
+     }
+ });
+ 
++// --- Robust smooth seek for separate audio/video ---
++let freezePlayback = false
++let shouldResume = false
++
++videoElement.addEventListener("seeking", () => {
++    freezePlayback = true
++    if (!videoElement.paused || (formatLoader.npa && !audioElement.paused)) {
++        shouldResume = true
++        videoElement.pause()
++        if (formatLoader.npa) audioElement.pause()
++    }
++})
++
++function resumeWhenBuffered() {
++    if (!freezePlayback || !shouldResume) return
++
++    const videoReady = videoElement.readyState >= 3
++    const audioReady = !formatLoader.npa || audioElement.readyState >= 3
++
++    if (videoReady && audioReady) {
++        freezePlayback = false
++        shouldResume = false
++        const t = videoElement.currentTime
++        if (formatLoader.npa) audioElement.currentTime = t
++        videoElement.play().catch(()=>{})
++        if (formatLoader.npa) audioElement.play().catch(()=>{})
++    } else {
++        // Retry shortly until both ready
++        requestAnimationFrame(resumeWhenBuffered)
++    }
++}
++
++videoElement.addEventListener("seeking", () => {
++    requestAnimationFrame(resumeWhenBuffered)
++})
++
+ 
+ const videoObserver = new IntersectionObserver((entries) => {
+     entries.forEach(entry => {
+-- 
+2.52.0
+

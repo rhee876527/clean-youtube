@@ -1,0 +1,45 @@
+From 60a326a1ec7821314646cd768179a16923be2078 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 15 Jan 2026 21:06:42 +0300
+Subject: [PATCH 29/31] replace alignment polling with timeupdate
+
+---
+ html/static/js/player.js | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 4f02dba..78bcafe 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -364,22 +364,23 @@ new QualitySelect();
+ const ignoreNext = { play: 0 };
+ 
+ function startSyncCheck() {
+-    if (syncCheckInterval) clearInterval(syncCheckInterval);
+-
+-    // Only start syncing if audio is ready or thereâ€™s no separate audio
++    // Only start syncing if audio is ready or there’s no separate audio
+     if (formatLoader.npa && audioElement.readyState < 2) {
+         audioElement.addEventListener('canplaythrough', startSyncCheck, { once: true });
+         return;
+     }
+ 
+-    syncCheckInterval = setInterval(() => {
++    const sync = () => {
+         if (!videoElement.paused && !audioElement.paused) {
+             const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+             if (drift > 0.1) {
+                 audioElement.currentTime = videoElement.currentTime;
+             }
+         }
+-    }, 1000);
++    };
++
++    videoElement.removeEventListener('timeupdate', sync);
++    videoElement.addEventListener('timeupdate', sync);
+ }
+ 
+ function stopSyncCheck() {
+-- 
+2.52.0
+

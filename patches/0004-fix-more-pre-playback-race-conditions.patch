@@ -1,0 +1,33 @@
+From 6fa42c7c1d1c89d17e67bc7825ea736dcc85a730 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 26 Oct 2025 11:41:00 +0300
+Subject: [PATCH 04/31] fix more pre-playback race conditions
+
+---
+ html/static/js/player.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index b6efd17..8446b1d 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -93,7 +93,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+     let reloading = false; // prevent rapid reload loops
+ 
+     const load = () => {
+-        if (locked || reloading) return;
++        if (locked && reloading) return;
+         reloading = true;
+ 
+         // prevent immediate consecutive reloads
+@@ -109,6 +109,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+         mediaElement.oncanplay = () => { locked = true; };
+ 
+         mediaElement.onerror = () => {
++            reloading = false;
+             if (locked) return;
+             attempt++;
+             if (attempt < retries) {
+-- 
+2.52.0
+

@@ -1,0 +1,50 @@
+From 1341b5ce7ffeeff4f67b3b7888fbd6e5229e936a Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 29 Dec 2025 21:29:54 +0300
+Subject: [PATCH 16/31] buffer + media syncing fixes
+
+---
+ html/static/js/player.js | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index d172231..8cc551b 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -2,16 +2,17 @@ import { q, qa, ElemJS } from "/static/js/elemjs/elemjs.js";
+ import { SubscribeButton } from "/static/js/modules/SubscribeButton.js";
+ 
+ const videoElement = q("#video");
+-videoElement.setAttribute("fetchpriority", "high");
++videoElement.setAttribute("fetchpriority", "low");
+ const audioElement = q("#audio");
+ // Buffer audio aggressively
++audioElement.setAttribute("fetchpriority", "high");
+ audioElement.preload = "auto";
+ 
+ // Make video focusable
+ videoElement.setAttribute("tabindex", "0");
+ 
+ let userInteracted = false;
+-document.addEventListener("click", () => { userInteracted = true; }, { once: true });
++document.addEventListener("click", () => { userInteracted = true; alignStreams(); }, { once: true });
+ 
+ let syncCheckInterval = null;
+ const videoFormats = new Map();
+@@ -136,6 +137,13 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+     tryLoad();
+ }
+ 
++function alignStreams() {
++    if (!audioElement.src || !videoElement.src) return;
++    const t = Math.max(audioElement.currentTime || 0, videoElement.currentTime || 0);
++    audioElement.currentTime = t;
++    videoElement.currentTime = t;
++}
++
+ 
+ let pipReady = false;
+ 
+-- 
+2.52.0
+

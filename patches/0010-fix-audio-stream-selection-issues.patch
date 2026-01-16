@@ -1,0 +1,63 @@
+From b35625238af17f71cf0d5a694dcfd68dc210e985 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 17 Nov 2025 21:28:33 +0300
+Subject: [PATCH 10/31] fix audio stream selection issues
+
+---
+ html/static/js/player.js | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 839e1c5..2ebfc43 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -165,6 +165,18 @@ class FormatLoader {
+     constructor() {
+         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
+         this.npa = null;
++
++        // --- FIX: attach best audio on initial load if video has no audio ---
++        const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
++        if (!hasAudio) {
++            const bestAudio = getBestAudioFormat();
++            if (bestAudio) {
++                this.npa = bestAudio;
++            }
++        }
++
++        // Load media immediately
++        requestAnimationFrame(() => this.update());
+     }
+ 
+     play(itag, isQualitySwitch = false) {
+@@ -182,11 +194,9 @@ class FormatLoader {
+         this.update(isQualitySwitch);
+     }
+ 
+-
+     update(isQualitySwitch = false) {
+         cleanupSync();
+ 
+-        // Use currentTime only if >0, otherwise let URL seek apply
+         const lastTime = isQualitySwitch ? videoElement.currentTime : null;
+ 
+         if (!this.npv.url) {
+@@ -195,7 +205,6 @@ class FormatLoader {
+         }
+ 
+         if (isQualitySwitch) {
+-
+             videoElement.pause();
+             stopSyncCheck();
+ 
+@@ -248,6 +257,7 @@ class FormatLoader {
+     }
+ }
+ 
++
+ const formatLoader = new FormatLoader();
+ 
+ class PlayManager {
+-- 
+2.52.0
+

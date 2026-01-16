@@ -1,0 +1,58 @@
+From 70a5385a0e23464aa343534ac1cd7022daa0d6c9 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 2 Jan 2026 17:31:22 +0300
+Subject: [PATCH 17/31] more warmup improvements
+
+---
+ html/static/js/player.js | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 8cc551b..6430f7d 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -27,6 +27,10 @@ const audioFormats = [];
+     }
+ });
+ 
++// --- pre-warm all known origins ---
++videoFormats.forEach(vf => warmup(vf.url));
++audioFormats.forEach(af => warmup(af.url));
++
+ // Update src from initial url page load
+ try {
+     const src = videoElement.querySelector('source')?.src
+@@ -97,13 +101,26 @@ function isValidUrl(string) {
+     }
+ }
+ 
++const warmedOrigins = new Set();
++
+ function warmup(url) {
+     try {
+         const origin = new URL(url).origin;
+-        const link = document.createElement("link");
+-        link.rel = "preconnect";
+-        link.href = origin;
+-        document.head.appendChild(link);
++        if (warmedOrigins.has(origin)) return; // already done
++        warmedOrigins.add(origin);
++
++        // Preconnect: TCP + TLS
++        const preconnectLink = document.createElement("link");
++        preconnectLink.rel = "preconnect";
++        preconnectLink.href = origin;
++        document.head.appendChild(preconnectLink);
++
++        // DNS prefetch
++        const dnsLink = document.createElement("link");
++        dnsLink.rel = "dns-prefetch";
++        dnsLink.href = origin;
++        document.head.appendChild(dnsLink);
++
+     } catch {}
+ }
+ 
+-- 
+2.52.0
+

@@ -1,0 +1,27 @@
+From 694ab576fed958e9c902a0f45490fedb75f9471a Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 14 Jan 2026 14:23:49 +0300
+Subject: [PATCH 20/31] improve seeking audio lag
+
+---
+ html/static/js/player.js | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 8eb73c4..cf06063 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -524,7 +524,9 @@ const videoObserver = new IntersectionObserver((entries) => {
+ videoObserver.observe(videoElement);
+ 
+ function relativeSeek(seconds) {
+-    videoElement.currentTime += seconds;
++    const t = videoElement.currentTime + seconds;
++    videoElement.currentTime = t;
++    if (formatLoader.npa) audioElement.currentTime = t;
+ }
+ 
+ async function playVideo() {
+-- 
+2.52.0
+

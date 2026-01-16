@@ -1,0 +1,63 @@
+From e24470042ace357fcaed748734036917e5ad44f9 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 15 Jan 2026 10:21:19 +0300
+Subject: [PATCH 24/31] more state mgt fixes
+
+---
+ html/static/js/player.js | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index c454505..e850d4b 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -486,12 +486,9 @@ videoElement.addEventListener("seeking", () => {
+ })
+ 
+ function resumeWhenBuffered() {
+-    if (!freezePlayback || !shouldResume) return
++    if (!freezePlayback || !shouldResume) return;
+ 
+-    const videoReady = videoElement.readyState >= 3
+-    const audioReady = !formatLoader.npa || audioElement.readyState >= 3
+-
+-    if (videoReady && audioReady) {
++    if (videoElement.readyState >= 2 && (!formatLoader.npa || audioElement.readyState >= 2)) {
+         freezePlayback = false
+         shouldResume = false
+         const t = videoElement.currentTime
+@@ -499,7 +496,6 @@ function resumeWhenBuffered() {
+         videoElement.play().catch(()=>{})
+         if (formatLoader.npa) audioElement.play().catch(()=>{})
+     } else {
+-        // Retry shortly until both ready
+         requestAnimationFrame(resumeWhenBuffered)
+     }
+ }
+@@ -592,10 +588,12 @@ videoElement.addEventListener("click", (event) => {
+     videoElement.focus();
+ });
+ 
+-videoElement.addEventListener("seeked", () => {
+-    if (formatLoader.npa) {
+-        audioElement.muted = false;
+-        audioElement.currentTime = videoElement.currentTime;
++videoElement.addEventListener("seeking", () => {
++    freezePlayback = true;
++    if (formatLoader.npa && !videoElement.paused) {
++        shouldResume = true;
++        videoElement.pause();
++        audioElement.pause();
+     }
+ });
+ 
+@@ -700,4 +698,4 @@ document.addEventListener('click', (event) => {
+   // Clear flag after seek settles
+   videoElement.addEventListener('seeked', () =>
+     setTimeout(() => userSeeking = false, 300), { once: true });
+-});
+\ No newline at end of file
++});
+-- 
+2.52.0
+

@@ -1,0 +1,53 @@
+From 26ad8852d9c9ea500f60aefac43ddc922b4af525 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 17 Nov 2025 21:38:32 +0300
+Subject: [PATCH 11/31] remember quality consistently even after url refresh
+
+---
+ html/static/js/player.js | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 2ebfc43..904900f 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -287,16 +287,16 @@ const playManagers = {
+ class QualitySelect extends ElemJS {
+     constructor() {
+         super(q("#quality-select"));
+-        const saved = localStorage.getItem("lastQuality");
+-        if (saved) this.element.value = saved;
+-        this.on("input", this.setFormat.bind(this));
+         this.initialized = false;
+ 
+-        // Defer initial format activation until the browser applies &t=
++        // Defer until DOM & videoFormats ready
+         requestAnimationFrame(() => {
+-            this.initialized = true;
++            const saved = localStorage.getItem("lastQuality");
++
++            // Only set value if the option exists
++            if (saved && this.element.querySelector(`option[value="${saved}"]`)) {
++                this.element.value = saved;
+ 
+-            if (saved) {
+                 if (videoElement.readyState >= 1) {
+                     formatLoader.play(saved, true);
+                 } else {
+@@ -305,9 +305,12 @@ class QualitySelect extends ElemJS {
+                     }, { once: true });
+                 }
+             }
++
++            this.initialized = true;
+         });
+-    }
+ 
++        this.on("input", this.setFormat.bind(this));
++    }
+ 
+     setFormat() {
+         if (!this.initialized) return;
+-- 
+2.52.0
+

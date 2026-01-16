@@ -1,0 +1,36 @@
+From d883a2829d4dd0fcb1c3b3937463641bc54fe95f Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 10 Jan 2026 13:32:39 +0300
+Subject: [PATCH 18/31] fix userInteracted
+
+---
+ html/static/js/player.js | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 6430f7d..162746a 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -226,6 +226,7 @@ class FormatLoader {
+     }
+ 
+     update(isQualitySwitch = false) {
++        if (!userInteracted) return;
+         cleanupSync();
+ 
+         const lastTime = isQualitySwitch ? videoElement.currentTime : null;
+@@ -569,9 +570,11 @@ async function playVideo() {
+ 
+ function togglePlaying() {
+     if (videoElement.paused) {
++        if (!userInteracted) return;
+         playVideo();
+     } else {
+         videoElement.pause();
++        if (formatLoader.npa) audioElement.pause(); // also pause separate audio
+     }
+ }
+ 
+-- 
+2.52.0
+

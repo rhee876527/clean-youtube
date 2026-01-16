@@ -1,0 +1,352 @@
+From 5c6585c55ff434b593cde6df0296525ccf5adea7 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 16 Jan 2026 12:49:59 +0300
+Subject: [PATCH 30/31] add comments
+
+---
+ api/video.js                   |  40 +++++++++-
+ html/static/js/comments.js     |  79 ++++++++++++++++++
+ pug/video.pug                  |  23 +++++-
+ sass/includes/_video-page.sass | 142 +++++++++++++++++++++++++++++++++
+ 4 files changed, 282 insertions(+), 2 deletions(-)
+ create mode 100644 html/static/js/comments.js
+
+diff --git a/api/video.js b/api/video.js
+index 859ca0a..1457579 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -126,8 +126,11 @@ module.exports = [
+ 				? request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json())
+ 				: JSON.parse(new URLSearchParams(body.toString()).get("video"));
+ 
++			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`).then(res => res.json());
++
+ 			try {
+ 				const video = await videoFuture;
++				const commentsData = await commentsFuture;
+ 				if (!video) throw new MessageError("The instance returned null.");
+ 				if (video.error) throw new InstanceError(video.error, video.identifier);
+ 
+@@ -167,7 +170,7 @@ module.exports = [
+ 
+ 				return render(200, "pug/video.pug", {
+ 					req, url, video, formats, subscribed, instanceOrigin, mediaFragment, autoplay, continuous,
+-					sessionWatched, sessionWatchedNext, settings
++					sessionWatched, sessionWatchedNext, settings, comments: commentsData.comments || []
+ 				});
+ 
+ 			} catch (error) {
+@@ -183,5 +186,40 @@ module.exports = [
+ 				return render(500, "pug/video.pug", {video: {videoId: id}, error: true, message, req, settings});
+ 			}
+ 		}
++	},
++	{
++		route: "/api/comments", methods: ["GET"], code: async ({req, url}) => {
++			const user = getUser(req);
++			const settings = user.getSettingsOrDefaults();
++			const videoId = url.searchParams.get("v");
++			const continuation = url.searchParams.get("continuation");
++
++			if (!videoId || !continuation) {
++				return {
++					statusCode: 400,
++					contentType: "application/json",
++					content: JSON.stringify({error: "Missing videoId or continuation"})
++				};
++			}
++
++			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
++
++			try {
++				const response = await request(`${instanceOrigin}/api/v1/comments/${videoId}?continuation=${encodeURIComponent(continuation)}`);
++				const data = await response.json();
++
++				return {
++					statusCode: 200,
++					contentType: "application/json",
++					content: JSON.stringify(data)
++				};
++			} catch (error) {
++				return {
++					statusCode: 500,
++					contentType: "application/json",
++					content: JSON.stringify({error: "Failed to fetch comments"})
++				};
++			}
++		}
+ 	}
+ ];
+\ No newline at end of file
+diff --git a/html/static/js/comments.js b/html/static/js/comments.js
+new file mode 100644
+index 0000000..5189537
+--- /dev/null
++++ b/html/static/js/comments.js
+@@ -0,0 +1,79 @@
++// Handle comment reply expansion
++document.querySelectorAll('.comment-reply-count').forEach(replyCountEl => {
++	replyCountEl.addEventListener('click', async (e) => {
++		e.preventDefault();
++		e.stopPropagation();
++
++		const continuation = replyCountEl.dataset.continuation;
++		const videoId = replyCountEl.dataset.videoId;
++		const commentItem = replyCountEl.closest('.comment-item');
++		const repliesContainer = commentItem.querySelector('.comment-replies-container');
++
++		// Toggle if already loaded
++		if (repliesContainer.style.display !== 'none') {
++			repliesContainer.style.display = 'none';
++			return;
++		}
++
++		// If already has content, just show it
++		if (repliesContainer.innerHTML) {
++			repliesContainer.style.display = 'block';
++			return;
++		}
++
++		// Set loading state
++		replyCountEl.textContent = 'Loading...';
++		replyCountEl.style.pointerEvents = 'none';
++		replyCountEl.style.opacity = '0.6';
++
++		try {
++			const response = await fetch(`/api/comments?v=${encodeURIComponent(videoId)}&continuation=${encodeURIComponent(continuation)}`);
++			const data = await response.json();
++
++			if (!data.comments || data.comments.length === 0) {
++				repliesContainer.innerHTML = '<div class="no-replies" style="padding: 12px; color: #999; font-size: 0.9em;">No replies available</div>';
++				repliesContainer.style.display = 'block';
++				return;
++			}
++
++			// Build HTML for replies
++			let repliesHTML = '<div class="nested-comments" style="margin-top: 12px; margin-left: 16px; padding-left: 12px; border-left: 2px solid #ccc;">';
++
++			data.comments.forEach(reply => {
++				repliesHTML += `
++					<div class="nested-comment-item" style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
++						<div class="nested-comment-author-info" style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;">
++							<a href="${reply.authorUrl}" class="nested-comment-author" style="font-weight: bold; text-decoration: none; color: inherit;">${escapeHtml(reply.author)}</a>
++							${reply.verified ? '<span class="nested-comment-verified" style="color: #4a90e2; font-size: 0.9em;">✓</span>' : ''}
++							<span class="nested-comment-time" style="font-size: 0.85em; color: #666;">${reply.publishedText}</span>
++						</div>
++						<div class="nested-comment-text" style="margin: 4px 0; word-wrap: break-word; color: inherit;">${reply.contentHtml}</div>
++						${reply.likeCount ? `<div class="nested-comment-likes" style="font-size: 0.85em; color: #666; margin-top: 4px;">👍 ${reply.likeCount}</div>` : ''}
++					</div>
++				`;
++			});
++
++			repliesHTML += '</div>';
++			repliesContainer.innerHTML = repliesHTML;
++			repliesContainer.style.display = 'block';
++		} catch (err) {
++			console.error('Failed to load replies:', err);
++			repliesContainer.innerHTML = '<div class="error-replies" style="padding: 12px; color: #e74c3c; font-size: 0.9em;">Failed to load replies</div>';
++			repliesContainer.style.display = 'block';
++		} finally {
++			// Restore button state
++			const replyCount = parseInt(replyCountEl.dataset.replyCount) || 1;
++			const plural = replyCount === 1 ? 'reply' : 'replies';
++			replyCountEl.textContent = `${replyCount} ${plural}`;
++			replyCountEl.style.pointerEvents = 'auto';
++			replyCountEl.style.opacity = '1';
++		}
++	});
++});
++
++// Helper function to escape HTML
++function escapeHtml(text) {
++	const div = document.createElement('div');
++	div.textContent = text;
++	return div.innerHTML;
++}
+diff --git a/pug/video.pug b/pug/video.pug
+index 28b8416..11673af 100644
+--- a/pug/video.pug
++++ b/pug/video.pug
+@@ -82,7 +82,28 @@ block content
+ 
+         .description#description!= video.descriptionHtml
+ 
+-      //- Standard view
++        .comments-section
++          h2.comments-header Comments
++          if comments && comments.length
++            .comments-list
++              each comment in comments
++                .comment-item(data-comment-id=comment.commentId)
++                  .comment-author-info
++                    a(href=comment.authorUrl class="comment-author")= comment.author
++                    if comment.verified
++                      .comment-verified ✓
++                    .comment-time= comment.publishedText
++                  .comment-text!= comment.contentHtml
++                  .comment-footer
++                    if comment.likeCount
++                      .comment-likes
++                        | 👍 #{comment.likeCount}
++                    if comment.replies && comment.replies.replyCount
++                      .comment-reply-count(data-continuation=comment.replies.continuation data-video-id=video.videoId data-reply-count=comment.replies.replyCount)= `${comment.replies.replyCount} ${comment.replies.replyCount === 1 ? 'reply' : 'replies'}`
++                  .comment-replies-container(style="display: none")
++          else
++            .no-comments Comments are disabled or unavailable for this video.
++      script(type="module" src=getStaticURL("html", "/static/js/comments.js"))
+       aside(style=continuous ? "display: none" : "")#standard-related-videos.related-videos
+         .related-cols
+           h2.related-header Related videos
+diff --git a/sass/includes/_video-page.sass b/sass/includes/_video-page.sass
+index 6774a83..abb68ee 100644
+--- a/sass/includes/_video-page.sass
++++ b/sass/includes/_video-page.sass
+@@ -197,3 +197,145 @@ $_theme: () !default
+ 
+ .fetch-status
+   white-space: pre-wrap
++
++// Comments
++
++.comments-section
++  margin-top: 32px
++  margin-bottom: 32px
++
++  .comments-header
++    font-size: 1.2em
++    font-weight: bold
++    margin-bottom: 16px
++    color: map.get($_theme, "text-0")
++
++  .comments-list
++    display: flex
++    flex-direction: column
++    gap: 16px
++
++  .comment-item
++    padding: 12px
++    border-left: 3px solid map.get($_theme, "edge-grey")
++    background-color: map.get($_theme, "bg-4")
++
++    .comment-author-info
++      display: flex
++      gap: 8px
++      margin-bottom: 8px
++      align-items: center
++
++      .comment-author
++        font-weight: bold
++        text-decoration: none
++        color: map.get($_theme, "text-0")
++
++        &:hover
++          text-decoration: underline
++
++      .comment-time
++        font-size: 0.85em
++        color: map.get($_theme, "text-1")
++
++  .comment-text
++    margin: 8px 0
++    word-wrap: break-word
++    color: map.get($_theme, "text-0")
++
++    a
++      color: map.get($_theme, "link-color")
++      text-decoration: none
++
++      &:hover
++        text-decoration: underline
++
++  .comment-likes
++    display: flex
++    align-items: center
++    gap: 4px
++    font-size: 0.9em
++    color: map.get($_theme, "text-1")
++
++    .like-icon
++      opacity: 0.7
++
++  .comment-footer
++    display: flex
++    gap: 16px
++    align-items: center
++    margin-top: 8px
++
++  .comment-reply-count
++    font-size: 0.9em
++    color: map.get($_theme, "text-1")
++    cursor: pointer
++    padding: 4px 8px
++    border-radius: 4px
++    transition: background-color 0.2s
++
++    &:hover
++      background-color: map.get($_theme, "bg-3")
++
++  .comment-verified
++    color: #4a90e2
++    font-size: 0.9em
++    margin-left: 4px
++
++  .comment-replies-container
++    margin-top: 12px
++    margin-left: 16px
++    padding-left: 12px
++    border-left: 2px solid map.get($_theme, "edge-grey")
++
++    .nested-comments
++      display: flex
++      flex-direction: column
++      gap: 8px
++
++    .nested-comment-item
++      padding: 8px 0
++      border-bottom: 1px solid map.get($_theme, "edge-grey")
++
++      &:last-child
++        border-bottom: none
++
++    .nested-comment-author-info
++      display: flex
++      gap: 8px
++      align-items: center
++      margin-bottom: 4px
++      font-size: 0.95em
++
++      .nested-comment-author
++        font-weight: bold
++        text-decoration: none
++        color: map.get($_theme, "text-0")
++
++        &:hover
++          text-decoration: underline
++
++      .nested-comment-verified
++        color: #4a90e2
++        font-size: 0.9em
++
++      .nested-comment-time
++        font-size: 0.85em
++        color: map.get($_theme, "text-1")
++
++    .nested-comment-text
++      margin: 4px 0
++      word-wrap: break-word
++      color: map.get($_theme, "text-0")
++      font-size: 0.95em
++
++    .nested-comment-likes
++      font-size: 0.85em
++      color: map.get($_theme, "text-1")
++      margin-top: 4px
++
++  .no-comments
++    padding: 20px
++    text-align: center
++    color: map.get($_theme, "text-1")
++    background-color: map.get($_theme, "bg-4")
+-- 
+2.52.0
+

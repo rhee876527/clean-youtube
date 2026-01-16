@@ -1,0 +1,96 @@
+From be0f5e6a1afa59f2f4223574341eb84e895f5226 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 14 Jan 2026 16:58:45 +0300
+Subject: [PATCH 21/31] smoothen playback ux
+
+---
+ html/static/js/player.js | 38 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 32 insertions(+), 6 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index cf06063..94c18e9 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -246,7 +246,7 @@ class FormatLoader {
+             const tryResume = () => {
+                 if (videoReady && (audioReady || !this.npa)) {
+                     if (lastTime !== null) videoElement.currentTime = lastTime;
+-                    videoElement.play().catch(() => {});
++                    safeVideoPlay().catch(() => {});
+ 
+                     if (this.npa) {
+                         if (lastTime !== null) audioElement.currentTime = lastTime;
+@@ -387,6 +387,32 @@ function cleanupSync() {
+     stopSyncCheck();
+ }
+ 
++async function safeVideoPlay() {
++    if (!formatLoader.npa) return videoElement.play().catch(()=>{});
++
++    const tryPlay = async () => {
++        const bufferedEnd = audioElement.buffered.length
++            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            : 0;
++
++        if (bufferedEnd >= videoElement.currentTime + 0.25) {
++            videoElement.play().catch(()=>{});
++        } else {
++            // Wait until audio buffers enough
++            await new Promise(resolve => {
++                const onCanPlay = () => {
++                    audioElement.removeEventListener('canplay', onCanPlay);
++                    resolve();
++                };
++                audioElement.addEventListener('canplay', onCanPlay);
++            });
++            tryPlay();
++        }
++    };
++
++    tryPlay();
++}
++
+ videoElement.addEventListener("play", startSyncCheck);
+ videoElement.addEventListener("pause", stopSyncCheck);
+ 
+@@ -496,7 +522,7 @@ function resumeWhenBuffered() {
+         shouldResume = false
+         const t = videoElement.currentTime
+         if (formatLoader.npa) audioElement.currentTime = t
+-        videoElement.play().catch(()=>{})
++        safeVideoPlay().catch(()=>{})
+         if (formatLoader.npa) audioElement.play().catch(()=>{})
+     } else {
+         // Retry shortly until both ready
+@@ -542,16 +568,16 @@ async function playVideo() {
+ 
+         // Only play video immediately if no separate audio, otherwise wait for audio
+         if (!formatLoader.npa) {
+-            await videoElement.play();
++            await safeVideoPlay();
+         } else {
+             // Wait until audio can play
+             if (audioElement.readyState >= 2) {
+                 await audioElement.play();
+-                await videoElement.play();
++                await safeVideoPlay();
+             } else {
+                 audioElement.addEventListener('canplaythrough', async () => {
+                     await audioElement.play();
+-                    await videoElement.play();
++                    await safeVideoPlay();
+                 }, { once: true });
+             }
+         }
+@@ -623,7 +649,7 @@ document.addEventListener("keydown", async (event) => {
+         // Attempt to play video and audio
+         try {
+             if (videoElement.paused) {
+-                await videoElement.play(); // counts as user gesture
++                await safeVideoPlay(); // counts as user gesture
+                 if (audioElement.src && playManagers.audio.isActive()) {
+                     try {
+                         await audioElement.play();
+-- 
+2.52.0
+

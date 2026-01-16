@@ -1,0 +1,127 @@
+From a97ef86f81b7a01fb1780d034a01552ef7dadcd4 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 17 Nov 2025 17:31:18 +0300
+Subject: [PATCH 07/31] smoothen out issues caused by audio load lag
+
+---
+ html/static/js/player.js | 37 +++++++++++++++++++++----------------
+ 1 file changed, 21 insertions(+), 16 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 2f14e49..b4e77c3 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -98,16 +98,14 @@ function isValidUrl(string) {
+ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+     let attempt = 0;
+     let locked = false;
+-    let reloading = false; // prevent rapid reload loops
++    let reloading = false;
+ 
+     const load = () => {
+         if (locked && reloading) return;
+         reloading = true;
+ 
+-        // prevent immediate consecutive reloads
+         setTimeout(() => { reloading = false; }, 3000);
+ 
+-        // if element already has usable buffered data, skip reload
+         if (mediaElement.readyState >= 3 && !mediaElement.error) return;
+ 
+         mediaElement.src = url;
+@@ -120,6 +118,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+             reloading = false;
+             if (locked) return;
+             attempt++;
++            console.error("Audio load failed:", url);
+             if (attempt < retries) {
+                 setTimeout(load, 4000 * attempt);
+             } else {
+@@ -128,6 +127,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+         };
+     };
+ 
++    // Start immediately; your play logic will guard actual playback
+     load();
+ }
+ 
+@@ -249,6 +249,13 @@ const ignoreNext = { play: 0 };
+ 
+ function startSyncCheck() {
+     if (syncCheckInterval) clearInterval(syncCheckInterval);
++
++    // Only start syncing if audio is ready or thereâ€™s no separate audio
++    if (formatLoader.npa && audioElement.readyState < 2) {
++        audioElement.addEventListener('canplaythrough', startSyncCheck, { once: true });
++        return;
++    }
++
+     syncCheckInterval = setInterval(() => {
+         if (!videoElement.paused && !audioElement.paused) {
+             const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+@@ -386,29 +393,27 @@ async function playVideo() {
+     if (!videoElement.paused) return;
+ 
+     audioElement.currentTime = videoElement.currentTime;
+-
+-    // stop the "play/pause fight" loop
+     ignoreNext.play = 2;
+ 
+     try {
+-        if (audioContext.state === 'suspended') {
+-            await audioContext.resume();
+-        }
+-
++        if (audioContext.state === 'suspended') await audioContext.resume();
+         await videoElement.play();
+ 
+         if (playManagers.audio.isActive() && audioElement.src) {
+-            try {
++            if (audioElement.readyState >= 2) {
+                 await audioElement.play();
+-            } catch (e) {
+-                console.warn("Audio blocked until user gesture:", e);
++            } else {
++                audioElement.addEventListener('canplaythrough', async () => {
++                    if (!audioElement.paused) await audioElement.play();
++                }, { once: true });
+             }
+         }
+     } catch (e) {
+-        console.error("Video play failed", e);
++        console.error("Playback failed:", e);
+     }
+ }
+ 
++
+ function togglePlaying() {
+     if (videoElement.paused) {
+         playVideo();
+@@ -425,7 +430,7 @@ function toggleFullScreen() {
+     }
+ }
+ 
+-// 🔴 Critical: Track interaction and refocus
++// ðŸ”´ Critical: Track interaction and refocus
+ videoElement.addEventListener("pointerdown", () => {
+     userInteracted = true
+     videoElement.focus();
+@@ -438,7 +443,7 @@ videoElement.addEventListener("click", (event) => {
+     videoElement.focus();
+ });
+ 
+-// ✅ Capture spacebar early and forcefully
++// âœ… Capture spacebar early and forcefully
+ const keyActions = new Map([
+     ["j", () => relativeSeek(-10)],
+     ["n", () => relativeSeek(-10)],
+@@ -529,4 +534,4 @@ document.addEventListener('click', (event) => {
+             window.history.replaceState(null, '', timestampEl.href);
+         }
+     }
+-});
+\ No newline at end of file
++});
+-- 
+2.52.0
+

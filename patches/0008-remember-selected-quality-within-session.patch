@@ -1,0 +1,156 @@
+From 86b26d57166cf9d7f2d22747e52837781f58e1e8 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 17 Nov 2025 19:48:03 +0300
+Subject: [PATCH 08/31] remember selected quality within session
+
+---
+ html/static/js/player.js | 101 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 84 insertions(+), 17 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index b4e77c3..839e1c5 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -167,11 +167,10 @@ class FormatLoader {
+         this.npa = null;
+     }
+ 
+-    play(itag) {
++    play(itag, isQualitySwitch = false) {
+         this.npv = videoFormats.get(itag);
+         this.npa = null;
+ 
+-        // Only attach separate audio if the stream has no audio codec
+         const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
+         if (!hasAudio) {
+             const bestAudio = getBestAudioFormat();
+@@ -180,29 +179,75 @@ class FormatLoader {
+             }
+         }
+ 
+-        this.update();
++        this.update(isQualitySwitch);
+     }
+ 
+-    update() {
++
++    update(isQualitySwitch = false) {
+         cleanupSync();
+-        const lastTime = videoElement.currentTime;
+ 
+-        loadMediaWithRetry(videoElement, this.npv.url);
+-        videoElement.currentTime = lastTime;
++        // Use currentTime only if >0, otherwise let URL seek apply
++        const lastTime = isQualitySwitch ? videoElement.currentTime : null;
++
++        if (!this.npv.url) {
++            console.error("No URL for video format! Cannot load.");
++            return;
++        }
++
++        if (isQualitySwitch) {
++
++            videoElement.pause();
++            stopSyncCheck();
++
++            let videoReady = false;
++            let audioReady = false;
++
++            const tryResume = () => {
++                if (videoReady && (audioReady || !this.npa)) {
++                    if (lastTime !== null) videoElement.currentTime = lastTime;
++                    videoElement.play().catch(() => {});
++
++                    if (this.npa) {
++                        if (lastTime !== null) audioElement.currentTime = lastTime;
++                        audioElement.play().catch(() => {});
++                    }
++
++                    startSyncCheck();
++                }
++            };
++
++            videoElement.src = this.npv.url;
++            videoElement.load();
++            videoElement.addEventListener('canplaythrough', () => {
++                videoReady = true;
++                tryResume();
++            }, { once: true });
++
++            if (this.npa) {
++                audioElement.src = this.npa.url;
++                audioElement.load();
++                audioElement.addEventListener('canplaythrough', () => {
++                    audioReady = true;
++                    tryResume();
++                }, { once: true });
++            } else {
++                audioElement.pause();
++                audioElement.removeAttribute("src");
++                audioReady = true;
++            }
+ 
+-        if (this.npa) {
+-            audioElement.pause();
+-            audioElement.src = "";
+-            loadMediaWithRetry(audioElement, this.npa.url);
+-            audioElement.currentTime = lastTime;
+         } else {
+-            audioElement.pause();
+-            audioElement.removeAttribute("src");
++            loadMediaWithRetry(videoElement, this.npv.url);
++
++            if (this.npa) loadMediaWithRetry(audioElement, this.npa.url);
++            else {
++                audioElement.pause();
++                audioElement.removeAttribute("src");
++            }
+         }
+     }
+ }
+ 
+-
+ const formatLoader = new FormatLoader();
+ 
+ class PlayManager {
+@@ -232,13 +277,35 @@ const playManagers = {
+ class QualitySelect extends ElemJS {
+     constructor() {
+         super(q("#quality-select"));
++        const saved = localStorage.getItem("lastQuality");
++        if (saved) this.element.value = saved;
+         this.on("input", this.setFormat.bind(this));
+-        this.setFormat();
++        this.initialized = false;
++
++        // Defer initial format activation until the browser applies &t=
++        requestAnimationFrame(() => {
++            this.initialized = true;
++
++            if (saved) {
++                if (videoElement.readyState >= 1) {
++                    formatLoader.play(saved, true);
++                } else {
++                    videoElement.addEventListener("loadedmetadata", () => {
++                        formatLoader.play(saved, true);
++                    }, { once: true });
++                }
++            }
++        });
+     }
+ 
++
+     setFormat() {
++        if (!this.initialized) return;
++
+         const itag = this.element.value;
+-        formatLoader.play(itag);
++        localStorage.setItem("lastQuality", itag);
++
++        formatLoader.play(itag, true);
+         videoElement.focus();
+     }
+ }
+-- 
+2.52.0
+

@@ -1,0 +1,46 @@
+From 0caac7349908b3c26b699eaafc085676cafabe7e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 17 Nov 2025 21:47:20 +0300
+Subject: [PATCH 12/31] tighten video+audio sync
+
+---
+ html/static/js/player.js | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 904900f..dbd8dba 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -472,19 +472,25 @@ async function playVideo() {
+     if (!userInteracted) return;
+     if (!videoElement.paused) return;
+ 
+-    audioElement.currentTime = videoElement.currentTime;
++    const targetTime = videoElement.currentTime;
++    audioElement.currentTime = targetTime;
+     ignoreNext.play = 2;
+ 
+     try {
+         if (audioContext.state === 'suspended') await audioContext.resume();
+-        await videoElement.play();
+ 
+-        if (playManagers.audio.isActive() && audioElement.src) {
++        // Only play video immediately if no separate audio, otherwise wait for audio
++        if (!formatLoader.npa) {
++            await videoElement.play();
++        } else {
++            // Wait until audio can play
+             if (audioElement.readyState >= 2) {
+                 await audioElement.play();
++                await videoElement.play();
+             } else {
+                 audioElement.addEventListener('canplaythrough', async () => {
+-                    if (!audioElement.paused) await audioElement.play();
++                    await audioElement.play();
++                    await videoElement.play();
+                 }, { once: true });
+             }
+         }
+-- 
+2.52.0
+

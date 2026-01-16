@@ -1,0 +1,41 @@
+From d83e89bd2cd64dbfa0f72da818f76030f4fd76af Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 10 Jan 2026 13:59:57 +0300
+Subject: [PATCH 19/31] remove sponsorblock deadcode
+
+---
+ html/static/js/player.js | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 162746a..8eb73c4 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -390,15 +390,6 @@ function cleanupSync() {
+ videoElement.addEventListener("play", startSyncCheck);
+ videoElement.addEventListener("pause", stopSyncCheck);
+ 
+-// --- SponsorBlock skip fix
+-let sponsorSkipInProgress = false; // flag to track SB skip
+-
+-// Wrap SponsorBlock skips by listening for its events
+-document.addEventListener("SponsorBlockSkip", () => {
+-    sponsorSkipInProgress = true;
+-    setTimeout(() => { sponsorSkipInProgress = false; }, 100); // short debounce
+-});
+-
+ function playbackIntervention(event) {
+     const target = event.target;
+     const other = target === videoElement ? audioElement : videoElement;
+@@ -407,7 +398,7 @@ function playbackIntervention(event) {
+     if (target.readyState < 2) return;
+ 
+     // Only sync audio for non-SB manual seeks
+-    if (!sponsorSkipInProgress && audioElement.src && !ignoreNext[event.type]--) {
++    if (audioElement.src && !ignoreNext[event.type]--) {
+         if (event.type === "seeked") {
+             const targetTime = target.currentTime;
+             other.currentTime = targetTime;
+-- 
+2.52.0
+

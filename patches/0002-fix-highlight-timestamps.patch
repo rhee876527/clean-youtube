@@ -1,0 +1,127 @@
+From 2ed5771a0233270ae11960279477343904f40d1f Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 24 Oct 2025 12:19:23 +0300
+Subject: [PATCH 02/31] fix highlight timestamps
+
+---
+ html/static/js/chapter-highlight.js | 69 +++++++++++++++++------------
+ utils/converters.js                 |  6 ++-
+ 2 files changed, 45 insertions(+), 30 deletions(-)
+
+diff --git a/html/static/js/chapter-highlight.js b/html/static/js/chapter-highlight.js
+index 5b44cd9..d87ecd3 100644
+--- a/html/static/js/chapter-highlight.js
++++ b/html/static/js/chapter-highlight.js
+@@ -1,4 +1,4 @@
+-import {q, qa, ElemJS} from "./elemjs/elemjs.js"
++import {q, ElemJS} from "./elemjs/elemjs.js"
+ 
+ class Chapter {
+ 	constructor(linkElement) {
+@@ -7,47 +7,58 @@ class Chapter {
+ 	}
+ }
+ 
+-let chapters = [...document.querySelectorAll("[data-clickable-timestamp]")].map(linkElement => new Chapter(linkElement))
++let chapters = [...document.querySelectorAll("[data-clickable-timestamp]")]
++    .map(el => new Chapter(el))
+ chapters.sort((a, b) => a.time - b.time)
+ 
+-function getCurrentChapter(time) {
+-	const candidates = chapters.filter(chapter => chapter.time <= time)
+-	if (candidates.length > 0) {
+-		return candidates[candidates.length - 1]
+-	} else {
+-		return null
+-	}
+-}
+-
+ const video = q("#video")
+ const description = q("#description")
+ const regularBackground = "var(--regular-background)"
+ const highlightBackground = "var(--highlight-background)"
+ const paddingWidth = 4
+ let lastChapter = null
+-setInterval(() => {
+-	const currentChapter = getCurrentChapter(video.currentTime)
+ 
++function getCurrentChapter(time) {
++	const candidates = chapters.filter(ch => ch.time <= time)
++	return candidates.length ? candidates[candidates.length - 1] : null
++}
++
++function updateHighlight() {
++	const currentChapter = getCurrentChapter(video.currentTime)
+ 	if (currentChapter !== lastChapter) {
+-		// Style link
+-		if (lastChapter) {
+-			lastChapter.link.removeClass("timestamp--active")
+-		}
+-		if (currentChapter) {
+-			currentChapter.link.class("timestamp--active")
+-		}
+-		// Style background
++		if (lastChapter) lastChapter.link.removeClass("timestamp--active")
++		//if (currentChapter) currentChapter.link.addClass("timestamp--active")
++
+ 		if (currentChapter) {
+-			const {offsetTop, offsetHeight} = currentChapter.link.element;
++			const {offsetTop, offsetHeight} = currentChapter.link.element
+ 			const offsetBottom = offsetTop + offsetHeight
+-			let gradient = `linear-gradient(to bottom,`
+-				+ ` ${regularBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetTop - paddingWidth}px,`
+-				+ ` ${highlightBackground} ${offsetBottom + paddingWidth}px, ${regularBackground} ${offsetBottom + paddingWidth}px)`
+-			console.log(gradient)
+-			description.style.background = gradient
++			description.style.background =
++				`linear-gradient(to bottom, ${regularBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetTop - paddingWidth}px, ${highlightBackground} ${offsetBottom + paddingWidth}px, ${regularBackground} ${offsetBottom + paddingWidth}px)`
+ 		} else {
+ 			description.style.background = ""
+ 		}
++		lastChapter = currentChapter
+ 	}
+-	lastChapter = currentChapter
+-}, 1000)
++}
++
++setInterval(updateHighlight, 250)
++
++document.addEventListener('click', e => {
++	const timestampEl = e.target.closest('[data-clickable-timestamp]')
++	if (!timestampEl) return
++
++	e.preventDefault()
++	const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'))
++	if (isNaN(time)) return
++
++	video.currentTime = time
++
++	// Convert seconds to YouTube-style t=XmYs
++	const minutes = Math.floor(time / 60)
++	const seconds = Math.floor(time % 60)
++	const tParam = `${minutes}m${seconds}s`
++
++	const url = new URL(window.location)
++	url.searchParams.set('t', tParam)
++	window.history.replaceState(null, '', url)
++})
+diff --git a/utils/converters.js b/utils/converters.js
+index 84e4535..c92f37d 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -94,7 +94,11 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 		params.set("t", timeURL)
+ 		const url = "/watch?" + params
+ 
+-		return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds})
++		// Ensure the data-clickable-timestamp attribute contains a plain
++		// numeric string (seconds). Passing a string avoids cases where the
++		// attribute could contain formats like "3:00" or "3m00s" which
++		// front-end parseFloat would misinterpret (e.g. parseFloat("3:00") === 3).
++		return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds: String(timeSeconds)})
+ 	})
+ 
+ 	return descriptionHtml
+-- 
+2.52.0
+

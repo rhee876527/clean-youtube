@@ -1,0 +1,84 @@
+From 0034e2648ad2a7933530a38ce2211486f9ed4afa Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 15 Jan 2026 12:31:56 +0300
+Subject: [PATCH 25/31] detach audio media fetching from userInteracted
+
+---
+ html/static/js/player.js | 48 ++++++++++++++++++++++++++++------------
+ 1 file changed, 34 insertions(+), 14 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index e850d4b..2a57976 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -289,9 +289,13 @@ class FormatLoader {
+     }
+ }
+ 
+-
+ const formatLoader = new FormatLoader();
+ 
++if (formatLoader.npa?.url) {
++    audioElement.src = formatLoader.npa.url;
++    audioElement.load();
++}
++
+ class PlayManager {
+     constructor(media, isAudio) {
+         this.media = media;
+@@ -679,23 +683,39 @@ audioElement.setAttribute('preload', 'metadata');
+ new SubscribeButton(q("#subscribe"));
+ 
+ let userSeeking = false;
++
+ document.addEventListener('click', (event) => {
+-  const timestampEl = event.target.closest('[data-clickable-timestamp]');
+-  if (!timestampEl) return;
++    const timestampEl = event.target.closest('[data-clickable-timestamp]');
++    if (!timestampEl) return;
++
++    event.preventDefault();
++    const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
++    if (isNaN(time)) return;
+ 
+-  event.preventDefault();
+-  const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+-  if (isNaN(time)) return;
++    userSeeking = true;
+ 
+-  // This single line stops the play/pause buffering loop
+-  userSeeking = true;
++    // Set times
++    videoElement.currentTime = time;
+ 
+-  videoElement.currentTime = time;
+-  if (formatLoader.npa) audioElement.currentTime = time;
++    if (formatLoader.npa?.url) {
++        audioElement.src = formatLoader.npa.url;
++        audioElement.load();
++        audioElement.currentTime = time;
++
++        // --- Natural delay: video cannot render past buffered audio ---
++        const waitForAudioBuffer = () => {
++            if (audioElement.buffered.length > 0) {
++                const start = audioElement.buffered.start(0);
++                if (videoElement.currentTime < start) videoElement.currentTime = start;
++            } else {
++                requestAnimationFrame(waitForAudioBuffer);
++            }
++        };
++        requestAnimationFrame(waitForAudioBuffer);
++    }
+ 
+-  window.history.replaceState(null, '', timestampEl.href);
++    window.history.replaceState(null, '', timestampEl.href);
+ 
+-  // Clear flag after seek settles
+-  videoElement.addEventListener('seeked', () =>
+-    setTimeout(() => userSeeking = false, 300), { once: true });
++    videoElement.addEventListener('seeked', () =>
++        setTimeout(() => userSeeking = false, 300), { once: true });
+ });
+-- 
+2.52.0
+

@@ -1,0 +1,30 @@
+From 9a4f0a42383aaecc656f3ccb2a5f226dc38be43c Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 15 Jan 2026 08:28:25 +0300
+Subject: [PATCH 22/31] fix seeking audio disappearance
+
+---
+ html/static/js/player.js | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 94c18e9..59a8662 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -618,6 +618,13 @@ videoElement.addEventListener("click", (event) => {
+     videoElement.focus();
+ });
+ 
++videoElement.addEventListener("seeked", () => {
++    if (formatLoader.npa) {
++        audioElement.muted = false;
++        audioElement.currentTime = videoElement.currentTime;
++    }
++});
++
+ // âœ… Capture spacebar early and forcefully
+ const keyActions = new Map([
+     ["j", () => relativeSeek(-10)],
+-- 
+2.52.0
+
