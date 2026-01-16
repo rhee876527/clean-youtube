@@ -530,20 +530,27 @@ let freezePlayback = false
 let shouldResume = false
 
 videoElement.addEventListener("seeking", async (event) => {
-    // --- New: delay video naturally if audio is ahead ---
     if (formatLoader.npa) {
         const targetTime = videoElement.currentTime;
+
+        // Let waitForAudioThenPlay handle pausing/resuming
         await waitForAudioThenPlay(videoElement, audioElement);
+
+        // Clear freeze flags immediately after waiting
+        freezePlayback = false;
+        shouldResume = false;
+
+        return; // skip old pause logic
     }
 
-    // --- Existing freezePlayback logic remains untouched ---
+    // Fallback for no separate audio
     freezePlayback = true;
-    if (!videoElement.paused || (formatLoader.npa && !audioElement.paused)) {
+    if (!videoElement.paused) {
         shouldResume = true;
-        videoElement.pause()
-        if (formatLoader.npa) audioElement.pause()
+        videoElement.pause();
     }
 });
+
 
 function resumeWhenBuffered() {
     if (!freezePlayback || !shouldResume) return;
