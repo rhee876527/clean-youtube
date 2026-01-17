@@ -293,6 +293,7 @@ const formatLoader = new FormatLoader();
 
 if (formatLoader.npa?.url) {
     audioElement.src = formatLoader.npa.url;
+    audioElement.preload = "auto";
     audioElement.load();
 }
 
@@ -434,10 +435,8 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
         return;
     }
 
-    // Wait until audio has at least one buffered range
+    // Wait until audio has at least 3s buffered ahead of video
     await new Promise(resolve => {
-        if (audioEl.buffered.length > 0) return resolve();
-
         const check = () => {
             if (audioEl.buffered.length > 0) {
                 const audioEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
@@ -447,11 +446,15 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
             }
             requestAnimationFrame(check);
         };
-        requestAnimationFrame(check);
+        check();
     });
 
     // Critical: re-check paused state after waiting — browser might have auto-paused or spam happened
     if (!videoEl.paused) return;
+
+    if (audioEl.readyState < 3) {
+        await new Promise(res => audioEl.addEventListener('canplay', res, { once: true }));
+    }
 
     // Sync times
     audioEl.currentTime = videoEl.currentTime;
@@ -600,7 +603,8 @@ const debouncedPlayVideo = debounce(async () => {
     try {
         if (audioContext.state === 'suspended') await audioContext.resume();
 
-        await waitForAudioThenPlay(videoElement, audioElement);
+        if (formatLoader.npa) await waitForAudioThenPlay(videoElement, audioElement);
+        else await videoElement.play();
     } catch (err) {
         if (err.name === 'AbortError') {
             // Expected during rapid seeks — silent ignore
@@ -732,7 +736,7 @@ if ('mediaSession' in navigator) {
 }
 
 videoElement.setAttribute('preload', 'metadata');
-audioElement.setAttribute('preload', 'metadata');
+//audioElement.setAttribute('preload', 'metadata');
 
 new SubscribeButton(q("#subscribe"));
 
