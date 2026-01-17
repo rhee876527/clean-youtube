@@ -14,3 +14,7 @@ node_modules
 /config/config.js
 
 Dockerfile
+
+# More unneeded
+patches
+scripts/sync-patches.sh
