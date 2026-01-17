@@ -1,7 +1,7 @@
-From 53e8276085e3f93dc5d72c8f48b93c93c85d790d Mon Sep 17 00:00:00 2001
+From d2b25361228310d7bfd2df9293f296063106f6eb Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Fri, 24 Oct 2025 14:15:31 +0300
-Subject: [PATCH 03/31] fix race seek/playback issue
+Subject: [PATCH] fix race seek/playback issue
 
 ---
  html/static/js/player.js | 51 +++++++++++++++++++++++++---------------

@@ -1,0 +1,47 @@
+From 20afc07b769d0ada0f45cca8533d14eb200bddbd Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 16 Jan 2026 17:58:35 +0300
+Subject: [PATCH] update README
+
+---
+ README.md | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/README.md b/README.md
+index 2154606..2b63a9e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,24 @@
++# A fork of Cloudtube
++
++This is how I watch Youtube. Clean UI. No ads.
++
++Features added:
++- Smooth media playback. (DASH makes this hard but current implementation is usable).
++- Media fetching retry with backoff.
++- Auto picture-in-picture when user leaves page mid-playback.
++- 720p setting selects correct video quality.
++- English audio is always preferred, including videos with dubbed audio.
++- Timestamp jump fixes.
++- Uses MediaSession API for external media control.
++- Comments from invidious API.
++
++Notes:
++- Requires a WORKING invidious instance.
++- Media playback on Firefox no good (as of Jan 2026).
++
++<details>
++<summary>Show Original README</summary>
++
+ # CloudTube
+ 
+ ## Navigation
+@@ -19,3 +40,5 @@
+ [todo]: https://todo.sr.ht/~cadence/tube
+ [matrix]: https://matrix.to/#/#cloudtube:cadence.moe
+ [docs]: https://git.sr.ht/~cadence/tube-docs
++
++</details>
+-- 
+2.52.0
+

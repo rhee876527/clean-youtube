@@ -1,7 +1,7 @@
-From 26ad8852d9c9ea500f60aefac43ddc922b4af525 Mon Sep 17 00:00:00 2001
+From 18432b2ae476533571ae972da0d5e9d4793494fc Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 17 Nov 2025 21:38:32 +0300
-Subject: [PATCH 11/31] remember quality consistently even after url refresh
+Subject: [PATCH] remember quality consistently even after url refresh
 
 ---
  html/static/js/player.js | 17 ++++++++++-------

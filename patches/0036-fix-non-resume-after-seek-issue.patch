@@ -1,0 +1,50 @@
+From a678de8fb45f6e1eca03a75812906d256a3e439b Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 16 Jan 2026 23:31:32 +0300
+Subject: [PATCH] fix non-resume after seek issue
+
+---
+ html/static/js/player.js | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index ad87e89..ad24b52 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -530,21 +530,28 @@ let freezePlayback = false
+ let shouldResume = false
+ 
+ videoElement.addEventListener("seeking", async (event) => {
+-    // --- New: delay video naturally if audio is ahead ---
+     if (formatLoader.npa) {
+         const targetTime = videoElement.currentTime;
++
++        // Let waitForAudioThenPlay handle pausing/resuming
+         await waitForAudioThenPlay(videoElement, audioElement);
++
++        // Clear freeze flags immediately after waiting
++        freezePlayback = false;
++        shouldResume = false;
++
++        return; // skip old pause logic
+     }
+ 
+-    // --- Existing freezePlayback logic remains untouched ---
++    // Fallback for no separate audio
+     freezePlayback = true;
+-    if (!videoElement.paused || (formatLoader.npa && !audioElement.paused)) {
++    if (!videoElement.paused) {
+         shouldResume = true;
+-        videoElement.pause()
+-        if (formatLoader.npa) audioElement.pause()
++        videoElement.pause();
+     }
+ });
+ 
++
+ function resumeWhenBuffered() {
+     if (!freezePlayback || !shouldResume) return;
+ 
+-- 
+2.52.0
+

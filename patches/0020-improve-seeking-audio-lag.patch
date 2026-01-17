@@ -1,7 +1,7 @@
-From 694ab576fed958e9c902a0f45490fedb75f9471a Mon Sep 17 00:00:00 2001
+From 56f4aa2e89bb55b977c97c79e12a15bdde7d9ce1 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Wed, 14 Jan 2026 14:23:49 +0300
-Subject: [PATCH 20/31] improve seeking audio lag
+Subject: [PATCH] improve seeking audio lag
 
 ---
  html/static/js/player.js | 4 +++-

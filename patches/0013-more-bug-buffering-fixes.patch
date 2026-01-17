@@ -1,7 +1,7 @@
-From 6778843e215a0130ebd0aae312d2756e6036ff15 Mon Sep 17 00:00:00 2001
+From d42c94c78d5a5a5f4e6db27d064f03574deea153 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 24 Nov 2025 14:48:13 +0300
-Subject: [PATCH 13/31] more bug buffering fixes
+Subject: [PATCH] more bug buffering fixes
 
 ---
  html/static/js/player.js | 30 ++++++++++++++++++++----------

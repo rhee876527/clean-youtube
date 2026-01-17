@@ -1,7 +1,7 @@
-From 0034e2648ad2a7933530a38ce2211486f9ed4afa Mon Sep 17 00:00:00 2001
+From 2820baf367e92f2954c2b1e6ae70ab150985d8dd Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Thu, 15 Jan 2026 12:31:56 +0300
-Subject: [PATCH 25/31] detach audio media fetching from userInteracted
+Subject: [PATCH] detach audio media fetching from userInteracted
 
 ---
  html/static/js/player.js | 48 ++++++++++++++++++++++++++++------------

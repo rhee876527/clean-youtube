@@ -1,7 +1,7 @@
-From 86b26d57166cf9d7f2d22747e52837781f58e1e8 Mon Sep 17 00:00:00 2001
+From 33a90ee3b632d31f866d8a0fbbe146b42359096c Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 17 Nov 2025 19:48:03 +0300
-Subject: [PATCH 08/31] remember selected quality within session
+Subject: [PATCH] remember selected quality within session
 
 ---
  html/static/js/player.js | 101 ++++++++++++++++++++++++++++++++-------

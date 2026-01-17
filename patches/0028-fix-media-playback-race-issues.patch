@@ -1,7 +1,7 @@
-From e018e0a7778df718c0283553b1b372b8537ec3ac Mon Sep 17 00:00:00 2001
+From c8a7dec64ca24bf18b27b3831dd26fedf2774d0a Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Thu, 15 Jan 2026 18:42:46 +0300
-Subject: [PATCH 28/31] fix media playback race issues
+Subject: [PATCH] fix media playback race issues
 
 ---
  html/static/js/player.js | 43 ++++++++++++++++++++++++++++++----------

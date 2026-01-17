@@ -1,0 +1,29 @@
+From dac761a8f845d52292f3dd1f7beda0120660c183 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 16 Jan 2026 23:45:33 +0300
+Subject: [PATCH] remove debug log from comment fetch exception
+
+---
+ api/video.js | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/api/video.js b/api/video.js
+index 1956955..bf67eb1 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -128,11 +128,7 @@ module.exports = [
+ 
+ 			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`)
+ 				.then(res => res.json())
+-				.catch(err => {
+-					console.error("Comments fetch failed:", err.code || err.message);
+-					return {comments: []};
+-				});
+-
++				.catch(() => ({ comments: [] }));
+ 
+ 			try {
+ 				const video = await videoFuture;
+-- 
+2.52.0
+

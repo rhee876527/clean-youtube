@@ -1,7 +1,7 @@
-From 5c6585c55ff434b593cde6df0296525ccf5adea7 Mon Sep 17 00:00:00 2001
+From 590f92c28e3d28918c876f2ff926ef9ed0e0291b Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Fri, 16 Jan 2026 12:49:59 +0300
-Subject: [PATCH 30/31] add comments
+Subject: [PATCH] add comments
 
 ---
  api/video.js                   |  40 +++++++++-

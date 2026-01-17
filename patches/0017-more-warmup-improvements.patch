@@ -1,7 +1,7 @@
-From 70a5385a0e23464aa343534ac1cd7022daa0d6c9 Mon Sep 17 00:00:00 2001
+From de99d35bb73c3b37b9c150f7688f68658e2b87d9 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Fri, 2 Jan 2026 17:31:22 +0300
-Subject: [PATCH 17/31] more warmup improvements
+Subject: [PATCH] more warmup improvements
 
 ---
  html/static/js/player.js | 25 +++++++++++++++++++++----

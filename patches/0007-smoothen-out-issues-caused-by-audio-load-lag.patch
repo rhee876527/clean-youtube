@@ -1,7 +1,7 @@
-From a97ef86f81b7a01fb1780d034a01552ef7dadcd4 Mon Sep 17 00:00:00 2001
+From 3163395f4c291a90823ad77fb70eb64ea29f974a Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 17 Nov 2025 17:31:18 +0300
-Subject: [PATCH 07/31] smoothen out issues caused by audio load lag
+Subject: [PATCH] smoothen out issues caused by audio load lag
 
 ---
  html/static/js/player.js | 37 +++++++++++++++++++++----------------

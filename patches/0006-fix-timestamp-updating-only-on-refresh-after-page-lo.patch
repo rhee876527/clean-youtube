@@ -1,7 +1,7 @@
-From e3d44ab9f6419939c5728829ba91d19dd7753fda Mon Sep 17 00:00:00 2001
+From 77e118b6443616ff884cd52fef6b163b43849168 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Thu, 30 Oct 2025 18:31:35 +0300
-Subject: [PATCH 06/31] fix timestamp updating only on refresh after page
+Subject: [PATCH] fix timestamp updating only on refresh after page
  load/chapter click
 
 ---

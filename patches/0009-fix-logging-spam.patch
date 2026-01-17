@@ -1,7 +1,7 @@
-From b399755f9b02bd4f6158593c7b3ea5b07a728bda Mon Sep 17 00:00:00 2001
+From 5ed1ac5748c54c1006c7fdb1aa158d8ed4f70b5c Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 17 Nov 2025 19:59:17 +0300
-Subject: [PATCH 09/31] fix logging spam
+Subject: [PATCH] fix logging spam
 
 ---
  html/static/js/chapter-highlight.js | 1 +

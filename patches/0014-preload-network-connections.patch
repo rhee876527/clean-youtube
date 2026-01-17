@@ -1,7 +1,7 @@
-From 85c497a0676abf4c2dad266046206f8636956fb6 Mon Sep 17 00:00:00 2001
+From 67495032f8e437479c3c519294998ccb9efa3d28 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Tue, 25 Nov 2025 23:28:19 +0300
-Subject: [PATCH 14/31] preload network connections
+Subject: [PATCH] preload network connections
 
 ---
  html/static/js/player.js | 34 ++++++++++++++++++++--------------

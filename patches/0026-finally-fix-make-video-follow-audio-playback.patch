@@ -1,7 +1,7 @@
-From b0111e3bf1ab97f8459b9bf0ee09e7d8476d7e17 Mon Sep 17 00:00:00 2001
+From 19f09dfe271d5da42d82f6080a70eaabbd60b7b2 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Thu, 15 Jan 2026 13:01:20 +0300
-Subject: [PATCH 26/31] finally fix make video follow audio playback
+Subject: [PATCH] finally fix make video follow audio playback
 
 ---
  html/static/js/player.js |  62 +++-

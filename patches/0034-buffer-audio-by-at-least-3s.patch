@@ -1,0 +1,30 @@
+From 7d1b9002030a3f2ec55ac73d802af26b59130029 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 16 Jan 2026 21:53:20 +0300
+Subject: [PATCH] buffer audio by at least 3s
+
+---
+ html/static/js/player.js | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 78bcafe..ad87e89 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -439,7 +439,12 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
+         if (audioEl.buffered.length > 0) return resolve();
+ 
+         const check = () => {
+-            if (audioEl.buffered.length > 0) return resolve();
++            if (audioEl.buffered.length > 0) {
++                const audioEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
++                if (audioEnd - videoEl.currentTime >= 3) {
++                    return resolve();
++                }
++            }
+             requestAnimationFrame(check);
+         };
+         requestAnimationFrame(check);
+-- 
+2.52.0
+

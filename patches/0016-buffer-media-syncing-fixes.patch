@@ -1,7 +1,7 @@
-From 1341b5ce7ffeeff4f67b3b7888fbd6e5229e936a Mon Sep 17 00:00:00 2001
+From 0aab8df67429703a1019ff36ffa3a794a2c7e7a5 Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Mon, 29 Dec 2025 21:29:54 +0300
-Subject: [PATCH 16/31] buffer + media syncing fixes
+Subject: [PATCH] buffer + media syncing fixes
 
 ---
  html/static/js/player.js | 12 ++++++++++--

@@ -1,7 +1,7 @@
-From 13716da489f4faf13edca5c45614904a9cb5e1a8 Mon Sep 17 00:00:00 2001
+From 121ea8dadecd0435d6171d3ff2812cd58dda8c3c Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Sun, 26 Oct 2025 11:56:48 +0300
-Subject: [PATCH 05/31] replace b720p with just 720p
+Subject: [PATCH] replace b720p with just 720p
 
 ---
  pug/settings.pug | 3 +--

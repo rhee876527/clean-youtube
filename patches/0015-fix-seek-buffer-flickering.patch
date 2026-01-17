@@ -1,7 +1,7 @@
-From a46d7e803d9ec07ed3544a59307a4b008759e0b3 Mon Sep 17 00:00:00 2001
+From d8c6bacb4d8e86e454b132f4c49e8b030cd56dde Mon Sep 17 00:00:00 2001
 From: Martin Kibera <martin.kibera.n@gmail.com>
 Date: Sat, 29 Nov 2025 00:11:40 +0300
-Subject: [PATCH 15/31] fix seek buffer flickering
+Subject: [PATCH] fix seek buffer flickering
 
 ---
  html/static/js/player.js | 36 ++++++++++++++++++++++++++++++++++++
