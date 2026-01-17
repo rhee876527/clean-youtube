@@ -1,0 +1,62 @@
+From 273921de76243e23b57e17337e172754756f4254 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 17 Jan 2026 14:19:00 +0300
+Subject: [PATCH] update docker image build
+
+---
+ .dockerignore |  4 ++++
+ Dockerfile    | 21 ++++++++++++++++-----
+ 2 files changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/.dockerignore b/.dockerignore
+index 0214111..3f66c74 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -14,3 +14,7 @@ node_modules
+ /config/config.js
+ 
+ Dockerfile
++
++# More unneeded
++patches
++scripts/sync-patches.sh
+\ No newline at end of file
+diff --git a/Dockerfile b/Dockerfile
+index cb80a03..ba5fe9d 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -1,14 +1,25 @@
+-FROM node:14-buster
++# ---- Build Stage ----
++FROM node:22-bookworm-slim AS build
+ 
+ WORKDIR /workdir
+ 
+-COPY package.json ./package.json
+-COPY package-lock.json ./package-lock.json
++COPY package.json package-lock.json ./
+ 
+-RUN npm install
++RUN apt-get update && apt-get install -y git python3 build-essential \
++    && npm install \
++    && rm -rf /var/lib/apt/lists/*
+ 
+ COPY . .
+ 
++# ---- Runtime Stage ----
++FROM node:22-bookworm-slim AS runtime
++
++WORKDIR /workdir
++
++# Copy only built node_modules and app code
++COPY --from=build /workdir/node_modules ./node_modules
++COPY --from=build /workdir ./
++
+ EXPOSE 10412
+ 
+-CMD npm start
++CMD ["npm", "start"]
+\ No newline at end of file
+-- 
+2.52.0
+

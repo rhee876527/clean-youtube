@@ -1,0 +1,85 @@
+From ad312ff7a73336affce0cbf1e36c6d91982c924e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 17 Jan 2026 13:25:35 +0300
+Subject: [PATCH] add retry to replies button
+
+---
+ html/static/js/comments.js | 34 ++++++++++++++++++++++++++++------
+ 1 file changed, 28 insertions(+), 6 deletions(-)
+
+diff --git a/html/static/js/comments.js b/html/static/js/comments.js
+index 5189537..936832d 100644
+--- a/html/static/js/comments.js
++++ b/html/static/js/comments.js
+@@ -9,14 +9,22 @@ document.querySelectorAll('.comment-reply-count').forEach(replyCountEl => {
+ 		const commentItem = replyCountEl.closest('.comment-item');
+ 		const repliesContainer = commentItem.querySelector('.comment-replies-container');
+ 
+-		// Toggle if already loaded
++		if (!repliesContainer) return; // defensive check
++
++		// Toggle if already visible
+ 		if (repliesContainer.style.display !== 'none') {
+ 			repliesContainer.style.display = 'none';
+ 			return;
+ 		}
+ 
+ 		// If already has content, just show it
+-		if (repliesContainer.innerHTML) {
++		if (repliesContainer.innerHTML && !repliesContainer.classList.contains('error')) {
++			repliesContainer.style.display = 'block';
++			return;
++		}
++
++		if (!continuation) {
++			repliesContainer.innerHTML = '<div class="no-replies" style="padding: 12px; color: #999; font-size: 0.9em;">No replies available</div>';
+ 			repliesContainer.style.display = 'block';
+ 			return;
+ 		}
+@@ -27,12 +35,23 @@ document.querySelectorAll('.comment-reply-count').forEach(replyCountEl => {
+ 		replyCountEl.style.opacity = '0.6';
+ 
+ 		try {
+-			const response = await fetch(`/api/comments?v=${encodeURIComponent(videoId)}&continuation=${encodeURIComponent(continuation)}`);
++			const controller = new AbortController();
++			const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
++
++			const response = await fetch(
++				`/api/comments?v=${encodeURIComponent(videoId)}&continuation=${encodeURIComponent(continuation)}`,
++				{ signal: controller.signal }
++			);
++
++			clearTimeout(timeoutId);
++
++			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+ 			const data = await response.json();
+ 
+-			if (!data.comments || data.comments.length === 0) {
++			if (!data || !Array.isArray(data.comments) || data.comments.length === 0) {
+ 				repliesContainer.innerHTML = '<div class="no-replies" style="padding: 12px; color: #999; font-size: 0.9em;">No replies available</div>';
+ 				repliesContainer.style.display = 'block';
++				repliesContainer.classList.remove('error'); // clear error state
+ 				return;
+ 			}
+ 
+@@ -56,12 +75,15 @@ document.querySelectorAll('.comment-reply-count').forEach(replyCountEl => {
+ 			repliesHTML += '</div>';
+ 			repliesContainer.innerHTML = repliesHTML;
+ 			repliesContainer.style.display = 'block';
++			repliesContainer.classList.remove('error');
++
+ 		} catch (err) {
+ 			console.error('Failed to load replies:', err);
+-			repliesContainer.innerHTML = '<div class="error-replies" style="padding: 12px; color: #e74c3c; font-size: 0.9em;">Failed to load replies</div>';
++			repliesContainer.innerHTML = '<div class="error-replies" style="padding: 12px; color: #e74c3c; font-size: 0.9em;">Failed to load replies. Click to retry.</div>';
+ 			repliesContainer.style.display = 'block';
++			repliesContainer.classList.add('error'); // mark as error
+ 		} finally {
+-			// Restore button state
++			// Restore button so it can be clicked again
+ 			const replyCount = parseInt(replyCountEl.dataset.replyCount) || 1;
+ 			const plural = replyCount === 1 ? 'reply' : 'replies';
+ 			replyCountEl.textContent = `${replyCount} ${plural}`;
+-- 
+2.52.0
+
