@@ -123,8 +123,17 @@ module.exports = [
 
 			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
 			const videoFuture = req.method === "GET"
-				? request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json())
-				: JSON.parse(new URLSearchParams(body.toString()).get("video"));
+				? (async () => {
+					// Fetch with invidious proxy if Music genre is found
+					let v = await request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json());
+
+					if (v && v.genre === "Music") {
+						v = await request(`${instanceOrigin}/api/v1/videos/${id}?local=1`).then(res => res.json());
+					}
+
+					return v;
+				})()
+				: Promise.resolve(JSON.parse(new URLSearchParams(body.toString()).get("video")));
 
 			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`)
 				.then(res => res.json())
