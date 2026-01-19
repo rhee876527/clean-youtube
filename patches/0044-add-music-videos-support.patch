@@ -1,0 +1,49 @@
+From d551b4d84af90be2e766c600c3a30439fa35a32f Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 19 Jan 2026 16:07:55 +0300
+Subject: [PATCH] add music videos support
+
+---
+ README.md    |  1 +
+ api/video.js | 13 +++++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/README.md b/README.md
+index 2b63a9e..67fdd02 100644
+--- a/README.md
++++ b/README.md
+@@ -11,6 +11,7 @@ Features added:
+ - Timestamp jump fixes.
+ - Uses MediaSession API for external media control.
+ - Comments from invidious API.
++- Music videos. (Needs invidious instance with local proxy enabled).
+ 
+ Notes:
+ - Requires a WORKING invidious instance.
+diff --git a/api/video.js b/api/video.js
+index bf67eb1..81e6d2a 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -123,8 +123,17 @@ module.exports = [
+ 
+ 			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
+ 			const videoFuture = req.method === "GET"
+-				? request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json())
+-				: JSON.parse(new URLSearchParams(body.toString()).get("video"));
++				? (async () => {
++					// Fetch with invidious proxy if Music genre is found
++					let v = await request(`${instanceOrigin}/api/v1/videos/${id}`).then(res => res.json());
++
++					if (v && v.genre === "Music") {
++						v = await request(`${instanceOrigin}/api/v1/videos/${id}?local=1`).then(res => res.json());
++					}
++
++					return v;
++				})()
++				: Promise.resolve(JSON.parse(new URLSearchParams(body.toString()).get("video")));
+ 
+ 			const commentsFuture = request(`${instanceOrigin}/api/v1/comments/${id}`)
+ 				.then(res => res.json())
+-- 
+2.52.0
+
