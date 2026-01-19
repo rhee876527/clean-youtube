@@ -1,0 +1,236 @@
+From 260c78468eeb836b345790f719c44699317cfd33 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 19 Jan 2026 20:15:41 +0300
+Subject: [PATCH] sync media efficiently, reduce cpu usage
+
+---
+ html/static/js/player.js | 126 +++++++++++++++++----------------------
+ 1 file changed, 55 insertions(+), 71 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 59c14f5..79d8373 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -144,7 +144,7 @@ function loadMediaWithRetry(mediaElement, url, retries = 6) {
+             console.error("Media load failed:", url);
+ 
+             if (attempt < retries) {
+-                setTimeout(tryLoad, 1000 * attempt); // gradual backoff, same logic, faster start
++                setTimeout(tryLoad, 1000 * attempt); // gradual backoff
+             } else {
+                 console.error("Failed to load media after", retries, "attempts.");
+             }
+@@ -364,26 +364,37 @@ new QualitySelect();
+ 
+ const ignoreNext = { play: 0 };
+ 
++// Throttle media sync
++function throttle(func, delay) {
++    let last = 0;
++    return (...args) => {
++        const now = performance.now();
++        if (now - last > delay) {
++            last = now;
++            func(...args);
++        }
++    };
++}
++
+ function startSyncCheck() {
+-    // Only start syncing if audio is ready or there’s no separate audio
+-    if (formatLoader.npa && audioElement.readyState < 2) {
+-        audioElement.addEventListener('canplaythrough', startSyncCheck, { once: true });
+-        return;
+-    }
++    if (!formatLoader.npa || audioElement.readyState < 3) return;
++
++    const sync = throttle(() => {
++        const audioEnd = audioElement.buffered.length
++            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            : 0;
+ 
+-    const sync = () => {
+-        if (!videoElement.paused && !audioElement.paused) {
++        if (audioEnd - videoElement.currentTime >= 0.5 && !videoElement.paused && !audioElement.paused) {
+             const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+-            if (drift > 0.1) {
+-                audioElement.currentTime = videoElement.currentTime;
+-            }
++            if (drift > 0.1) audioElement.currentTime = videoElement.currentTime;
+         }
+-    };
++    }, 200);
+ 
+     videoElement.removeEventListener('timeupdate', sync);
+     videoElement.addEventListener('timeupdate', sync);
+ }
+ 
++
+ function stopSyncCheck() {
+     if (syncCheckInterval) clearInterval(syncCheckInterval);
+     syncCheckInterval = null;
+@@ -403,7 +414,7 @@ function playbackIntervention(event) {
+     // Prevent race while media is buffering or not ready
+     if (target.readyState < 2) return;
+ 
+-    // Only sync audio for non-SB manual seeks
++    // Sync audio for manual seeks
+     if (audioElement.src && !ignoreNext[event.type]--) {
+         if (event.type === "seeked") {
+             const targetTime = target.currentTime;
+@@ -430,7 +441,6 @@ function playbackIntervention(event) {
+ async function waitForAudioThenPlay(videoEl, audioEl) {
+     if (videoEl.paused === false) return;
+     if (!formatLoader.npa) {
+-        // No separate audio, play video immediately
+         await videoEl.play();
+         return;
+     }
+@@ -438,43 +448,22 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
+     // Wait until audio has at least 3s buffered ahead of video
+     await new Promise(resolve => {
+         const check = () => {
+-            if (audioEl.buffered.length > 0) {
+-                const audioEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
+-                if (audioEnd - videoEl.currentTime >= 3) {
+-                    return resolve();
+-                }
+-            }
++            const audioEnd = audioEl.buffered.length
++                ? audioEl.buffered.end(audioEl.buffered.length - 1)
++                : 0;
++
++            if (audioEnd - videoEl.currentTime >= 3) return resolve();
+             requestAnimationFrame(check);
+         };
+         check();
+     });
+ 
+-    // Critical: re-check paused state after waiting — browser might have auto-paused or spam happened
+-    if (!videoEl.paused) return;
+-
+-    if (audioEl.readyState < 3) {
+-        await new Promise(res => audioEl.addEventListener('canplay', res, { once: true }));
+-    }
+-
+-    // Sync times
+     audioEl.currentTime = videoEl.currentTime;
+ 
+-    // Attempt playback; browser may block until gesture
+-    try {
+-        await audioEl.play();
+-    } catch (err) {
+-        if (err.name !== 'AbortError') {
+-            console.warn("Audio play interrupted:", err);
+-        }
+-    }
++    try { await audioEl.play(); } catch {}
++    try { await videoEl.play(); } catch {}
+ 
+-    try {
+-        await videoEl.play();
+-    } catch (err) {
+-        if (err.name !== 'AbortError') {
+-            console.warn("Video play interrupted:", err);
+-        }
+-    }
++    startSyncCheck();
+ }
+ 
+ function debounce(func, wait) {
+@@ -507,7 +496,6 @@ videoElement.addEventListener("waiting", () => console.log("Video buffering...")
+ audioElement.addEventListener("waiting", () => console.log("Audio buffering..."));
+ 
+ // Fix reverb on buffering mid-playback
+-// --- Robust mid-playback buffering isolation ---
+ let wasPlayingBeforeBuffer = false;
+ 
+ videoElement.addEventListener("waiting", () => {
+@@ -528,45 +516,42 @@ videoElement.addEventListener("playing", () => {
+     }
+ });
+ 
+-// --- Robust smooth seek for separate audio/video ---
++// Smooth seek for DASH audio/video
+ let freezePlayback = false
+ let shouldResume = false
+ 
+-videoElement.addEventListener("seeking", async (event) => {
+-    if (formatLoader.npa) {
+-        const targetTime = videoElement.currentTime;
++videoElement.addEventListener("seeking", async () => {
++    if (!formatLoader.npa) return;
+ 
+-        // Let waitForAudioThenPlay handle pausing/resuming
+-        await waitForAudioThenPlay(videoElement, audioElement);
++    freezePlayback = true;
++    shouldResume = !videoElement.paused;
+ 
+-        // Clear freeze flags immediately after waiting
+-        freezePlayback = false;
+-        shouldResume = false;
++    videoElement.pause();
++    audioElement.pause();
+ 
+-        return; // skip old pause logic
+-    }
++    await waitForAudioThenPlay(videoElement, audioElement);
+ 
+-    // Fallback for no separate audio
+-    freezePlayback = true;
+-    if (!videoElement.paused) {
+-        shouldResume = true;
+-        videoElement.pause();
+-    }
++    freezePlayback = false;
++    shouldResume = false;
+ });
+ 
+ 
+ function resumeWhenBuffered() {
+     if (!freezePlayback || !shouldResume) return;
+ 
+-    if (videoElement.readyState >= 2 && (!formatLoader.npa || audioElement.readyState >= 2)) {
+-        freezePlayback = false
+-        shouldResume = false
+-        const t = videoElement.currentTime
+-        if (formatLoader.npa) audioElement.currentTime = t
+-        videoElement.play().catch(()=>{})
+-        if (formatLoader.npa) audioElement.play().catch(()=>{})
++    const audioEnd = audioElement.buffered.length
++        ? audioElement.buffered.end(audioElement.buffered.length - 1)
++        : 0;
++
++    if (audioEnd - videoElement.currentTime >= 3) {
++        freezePlayback = false;
++        shouldResume = false;
++
++        audioElement.currentTime = videoElement.currentTime;
++        videoElement.play().catch(() => {});
++        audioElement.play().catch(() => {});
+     } else {
+-        requestAnimationFrame(resumeWhenBuffered)
++        requestAnimationFrame(resumeWhenBuffered);
+     }
+ }
+ 
+@@ -595,7 +580,7 @@ function relativeSeek(seconds) {
+     if (formatLoader.npa) audioElement.currentTime = t;
+ }
+ 
+-// Near the top
++// Throttle play calls on sustained seek events
+ const debouncedPlayVideo = debounce(async () => {
+     if (!userInteracted) return;
+     if (!videoElement.paused) return;
+@@ -614,7 +599,6 @@ const debouncedPlayVideo = debounce(async () => {
+     }
+ }, 100);
+ 
+-// Then change playVideo to:
+ async function playVideo() {
+     debouncedPlayVideo();
+ }
+-- 
+2.52.0
+
