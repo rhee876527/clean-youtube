@@ -11,6 +11,12 @@ audioElement.preload = "auto";
 // Make video focusable
 videoElement.setAttribute("tabindex", "0");
 
+// Get instance for proxy rewrite
+window.instanceOrigin = new URL(window.instanceOrigin).origin;
+
+// Track proxy use
+const proxyApplied = new Map();
+
 let userInteracted = false;
 document.addEventListener("click", () => { userInteracted = true; alignStreams(); }, { once: true });
 
@@ -30,6 +36,7 @@ const audioFormats = [];
 // --- pre-warm all known origins ---
 videoFormats.forEach(vf => warmup(vf.url));
 audioFormats.forEach(af => warmup(af.url));
+warmup(window.instanceOrigin);
 
 // Update src from initial url page load
 try {
@@ -124,24 +131,75 @@ function warmup(url) {
     } catch {}
 }
 
-function loadMediaWithRetry(mediaElement, url, retries = 6) {
+function rewriteToProxyUrl(url) {
+    try {
+        if (!url.startsWith("http")) url = "https:" + url;
+        const u = new URL(url);
+
+        if (!u.hostname.endsWith("googlevideo.com")) return url; // only rewrite GoogleVideo URLs
+        u.hostname = new URL(window.instanceOrigin).hostname;
+        u.searchParams.delete("host"); // remove original host param
+        console.log("[DEBUG] Rewritten proxy URL:", u.href);
+        return u.href;
+    } catch (err) {
+        console.error("[DEBUG] Failed to rewrite URL:", url, err);
+        return url;
+    }
+}
+
+function getActiveUrl(url) {
+    if (proxyApplied.get(url)) {
+        return rewriteToProxyUrl(url);
+    }
+    return url;
+}
+
+function isCurrentVideoProxied() {
+    const currentSrc = videoElement.src;
+    if (!currentSrc) return false;
+    // Check if any URL in proxyApplied map matches the pattern of current video
+    for (const [url, applied] of proxyApplied.entries()) {
+        if (applied && url && videoElement.src && videoElement.src.includes(window.instanceOrigin)) {
+            return true;
+        }
+    }
+    // Also check if the current src is already a proxied URL
+    return currentSrc.includes(window.instanceOrigin);
+}
+
+async function loadMediaWithRetry(mediaElement, url, retries = 6) {
     let attempt = 0;
     let locked = false;
+    let triedInstanceProxy = false;
+
 
     function tryLoad() {
-        // warm up connection BEFORE requesting the media
-        warmup(url);
-
         mediaElement.src = url;
         mediaElement.load();
 
         mediaElement.onplaying = () => { locked = true; };
         mediaElement.oncanplay = () => { locked = true; };
 
-        mediaElement.onerror = () => {
+        mediaElement.onerror = async (e) => {
             if (locked) return;
             attempt++;
-            console.error("Media load failed:", url);
+
+            // Determine if error is 403 or not supported
+            const shouldRetryWithProxy = !triedInstanceProxy && (
+                e?.target?.error?.code === 4 || // MEDIA_ERR_SRC_NOT_SUPPORTED
+                e?.target?.error?.code === 1 // MEDIA_ERR_ABORTED or treat as forbidden
+            );
+
+            if (shouldRetryWithProxy) {
+                triedInstanceProxy = true;
+                proxyApplied.set(url, true);
+                console.log("[DEBUG] Media error, retrying with instance proxy...");
+
+                url = rewriteToProxyUrl(url);
+                attempt = 0; // reset attempts for proxy
+                tryLoad();
+                return;
+            }
 
             if (attempt < retries) {
                 setTimeout(tryLoad, 1000 * attempt); // gradual backoff
@@ -197,13 +255,11 @@ class FormatLoader {
         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
         this.npa = null;
 
-        // --- FIX: attach best audio on initial load if video has no audio ---
+        // --- attach best audio if video has no audio ---
         const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
         if (!hasAudio) {
             const bestAudio = getBestAudioFormat();
-            if (bestAudio) {
-                this.npa = bestAudio;
-            }
+            if (bestAudio) this.npa = bestAudio;
         }
 
         // Load media immediately
@@ -217,9 +273,7 @@ class FormatLoader {
         const hasAudio = this.npv.type && (this.npv.type.includes("mp4a") || this.npv.type.includes("audio"));
         if (!hasAudio) {
             const bestAudio = getBestAudioFormat();
-            if (bestAudio && bestAudio.url !== this.npv.url) {
-                this.npa = bestAudio;
-            }
+            if (bestAudio && bestAudio.url !== this.npv.url) this.npa = bestAudio;
         }
 
         this.update(isQualitySwitch);
@@ -240,6 +294,15 @@ class FormatLoader {
             videoElement.pause();
             stopSyncCheck();
 
+            // Preserve proxy state when switching quality
+            const wasProxied = isCurrentVideoProxied();
+            if (wasProxied) {
+                proxyApplied.set(this.npv.url, true);
+                if (this.npa) {
+                    proxyApplied.set(this.npa.url, true);
+                }
+            }
+
             let videoReady = false;
             let audioReady = false;
 
@@ -257,7 +320,8 @@ class FormatLoader {
                 }
             };
 
-            videoElement.src = this.npv.url;
+            const activeVideoUrl = getActiveUrl(this.npv.url);
+            videoElement.src = activeVideoUrl;
             videoElement.load();
             videoElement.addEventListener('canplaythrough', () => {
                 videoReady = true;
@@ -265,7 +329,7 @@ class FormatLoader {
             }, { once: true });
 
             if (this.npa) {
-                audioElement.src = this.npa.url;
+                audioElement.src = getActiveUrl(this.npa.url);
                 audioElement.load();
                 audioElement.addEventListener('canplaythrough', () => {
                     audioReady = true;
@@ -278,9 +342,9 @@ class FormatLoader {
             }
 
         } else {
-            loadMediaWithRetry(videoElement, this.npv.url);
+            loadMediaWithRetry(videoElement, getActiveUrl(this.npv.url));
 
-            if (this.npa) loadMediaWithRetry(audioElement, this.npa.url);
+            if (this.npa) loadMediaWithRetry(audioElement, getActiveUrl(this.npa.url));
             else {
                 audioElement.pause();
                 audioElement.removeAttribute("src");

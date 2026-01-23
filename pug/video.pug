@@ -10,7 +10,9 @@ block head
     title Error - CloudTube
   script(type="module" src=getStaticURL("html", "/static/js/player.js"))
   script(type="module" src=getStaticURL("html", "/static/js/chapter-highlight.js"))
-  script const data = !{JSON.stringify({...video, continuous})}
+  script.
+    const data = !{JSON.stringify({...video, continuous})};
+    window.instanceOrigin = "#{instanceOrigin}";
 
 block content
   unless error
