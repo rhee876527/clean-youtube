@@ -1,0 +1,32 @@
+From 8b075536932ae42937fb7581f1f4568468f51000 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 23 Jan 2026 10:16:58 +0300
+Subject: [PATCH] fix sorting for video qualities
+
+---
+ api/video.js | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/api/video.js b/api/video.js
+index 81e6d2a..8c0963f 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -41,8 +41,13 @@ function sortFormats(video, preference) {
+ 	let formats = [...formatStreams, ...adaptiveFormats];
+ 
+ 	formats.forEach(format => {
+-		if (!format.second__height && format.resolution) {
+-			format.second__height = +format.resolution.slice(0, -1);
++		if (!format.second__height) {
++			if (format.qualityLabel) {
++				// For adaptive formats, use qualityLabel not resolution
++				format.second__height = +format.qualityLabel.slice(0, -1);
++			} else if (format.resolution) {
++				format.second__height = +format.resolution.slice(0, -1);
++			}
+ 		}
+ 		if (!format.second__order) {
+ 			format.second__order = formatOrder(format);
+-- 
+2.52.0
+

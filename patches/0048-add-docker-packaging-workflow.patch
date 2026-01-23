@@ -1,0 +1,55 @@
+From 798e9a825ff41b169e492786f082ba8895f04755 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 22 Jan 2026 23:08:01 +0300
+Subject: [PATCH] add docker packaging workflow
+
+---
+ .github/workflows/docker-build.yml | 35 ++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 .github/workflows/docker-build.yml
+
+diff --git a/.github/workflows/docker-build.yml b/.github/workflows/docker-build.yml
+new file mode 100644
+index 0000000..4e1356d
+--- /dev/null
++++ b/.github/workflows/docker-build.yml
+@@ -0,0 +1,35 @@
++name: docker-publish
++
++on:
++  workflow_dispatch:
++
++jobs:
++  login:
++    runs-on: ubuntu-latest
++    env:
++      PACKAGE_NAME: cloudtube
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Set up QEMU
++        uses: docker/setup-qemu-action@v3
++
++      - name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v3
++
++      - name: Login to GitHub Container Registry
++        uses: docker/login-action@v3
++        with:
++          registry: ghcr.io
++          username: ${{ github.repository_owner }}
++          password: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Build and push Docker image
++        uses: docker/build-push-action@v5
++        with:
++          context: .
++          push: true
++          tags: ghcr.io/${{ github.repository_owner }}/${{ env.PACKAGE_NAME }}
++          platforms: linux/amd64, linux/arm64
+\ No newline at end of file
+-- 
+2.52.0
+
