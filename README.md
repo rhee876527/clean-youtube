@@ -11,7 +11,6 @@ Features added:
 - Timestamp jump fixes.
 - Uses MediaSession API for external media control.
 - Comments from invidious API.
-- Music videos. (Needs invidious instance with local proxy enabled).
 
 Notes:
 - Requires a WORKING invidious instance.
