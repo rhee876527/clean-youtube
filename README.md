@@ -11,7 +11,7 @@ Features added:
 - Timestamp jump fixes.
 - Uses MediaSession API for external media control.
 - Comments from invidious API.
-- Retry Youtube 403 errors with proxy. (Needs invidious instance with local proxy enabled).
+- Retry Youtube 403 errors with proxy.
 
 Notes:
 - Requires a WORKING invidious instance.
