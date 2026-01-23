@@ -41,8 +41,13 @@ function sortFormats(video, preference) {
 	let formats = [...formatStreams, ...adaptiveFormats];
 
 	formats.forEach(format => {
-		if (!format.second__height && format.resolution) {
-			format.second__height = +format.resolution.slice(0, -1);
+		if (!format.second__height) {
+			if (format.qualityLabel) {
+				// For adaptive formats, use qualityLabel not resolution
+				format.second__height = +format.qualityLabel.slice(0, -1);
+			} else if (format.resolution) {
+				format.second__height = +format.resolution.slice(0, -1);
+			}
 		}
 		if (!format.second__order) {
 			format.second__order = formatOrder(format);
