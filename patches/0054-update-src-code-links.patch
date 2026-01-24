@@ -1,0 +1,37 @@
+From f5838eedc718d5395cdad2e36d137d1e353be4b1 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 24 Jan 2026 09:54:09 +0300
+Subject: [PATCH] update src code links
+
+---
+ pug/includes/layout.pug | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/pug/includes/layout.pug b/pug/includes/layout.pug
+index 87ada7b..29543c6 100644
+--- a/pug/includes/layout.pug
++++ b/pug/includes/layout.pug
+@@ -17,7 +17,7 @@ html
+     meta(name="msapplication-TileColor" content="#2b5797")
+     meta(name="msapplication-config" content="/browserconfig.xml")
+     meta(name="theme-color" content="#36393f")
+-  
++
+     block head
+ 
+   body.show-focus
+@@ -48,9 +48,8 @@ html
+             div
+               h3.footer__colhead Source code
+               ul.footer__list
+-                li: a(href="https://sr.ht/~cadence/tube") Project hub
+-                li: a(href="https://lists.sr.ht/~cadence/tube-announce") Announcements
+-                li: a(href="https://todo.sr.ht/~cadence/tube") Report a problem
++                li: a(href="https://github.com/rhee876527/clean-youtube") Project repository
++                li: a(href="https://github.com/rhee876527/clean-youtube/issues/new") Report a problem
+             div
+               h3.footer__colhead About
+               ul.footer__list
+-- 
+2.52.0
+

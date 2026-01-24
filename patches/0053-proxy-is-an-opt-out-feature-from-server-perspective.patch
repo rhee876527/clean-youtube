@@ -1,0 +1,25 @@
+From d672166f520a95cd9c99ea20fc97f5ef42a2686f Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 24 Jan 2026 02:45:40 +0300
+Subject: [PATCH] proxy is an opt out feature from server perspective
+
+---
+ README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index d9145c2..e2ea5ea 100644
+--- a/README.md
++++ b/README.md
+@@ -11,7 +11,7 @@ Features added:
+ - Timestamp jump fixes.
+ - Uses MediaSession API for external media control.
+ - Comments from invidious API.
+-- Retry Youtube 403 errors with proxy. (Needs invidious instance with local proxy enabled).
++- Retry Youtube 403 errors with proxy.
+ 
+ Notes:
+ - Requires a WORKING invidious instance.
+-- 
+2.52.0
+
