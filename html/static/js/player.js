@@ -772,16 +772,35 @@ document.addEventListener("keydown", async (event) => {
 }, true); // capture phase: critical for gesture detection
 
 
-if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-        title: 'Video Title',
-        artist: 'Artist Name',
-        album: 'Album Name',
-    });
+// MediaSession
+function updateMediaSession() {
+  if (!('mediaSession' in navigator)) return;
 
-    navigator.mediaSession.setActionHandler('play', togglePlaying);
-    navigator.mediaSession.setActionHandler('pause', togglePlaying);
+  navigator.mediaSession.metadata = null;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: data?.title || document.title,
+    artist: data?.author || ''
+  });
+  navigator.mediaSession.playbackState = videoElement.paused ? 'paused' : 'playing';
 }
+
+// Claim on meaningful events only
+['play','pause','loadedmetadata','canplay','seeked'].forEach(e =>
+  videoElement.addEventListener(e, updateMediaSession)
+);
+
+// Override on format/quality switches
+const _origPlay = formatLoader.play.bind(formatLoader);
+formatLoader.play = (...args) => { _origPlay(...args); requestAnimationFrame(updateMediaSession); };
+
+// Media keys scoped to this tab
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play', togglePlaying);
+  navigator.mediaSession.setActionHandler('pause', togglePlaying);
+}
+
+// Initial claim
+updateMediaSession();
 
 videoElement.setAttribute('preload', 'metadata');
 //audioElement.setAttribute('preload', 'metadata');
