@@ -15,7 +15,6 @@ Features added:
 
 Notes:
 - Requires a WORKING invidious instance.
-- Media playback on Firefox no good (as of Jan 2026).
 
 <details>
 <summary>Show Original README</summary>
