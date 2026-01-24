@@ -443,16 +443,30 @@ function throttle(func, delay) {
 function startSyncCheck() {
     if (!formatLoader.npa || audioElement.readyState < 3) return;
 
-    const sync = throttle(() => {
-        const audioEnd = audioElement.buffered.length
-            ? audioElement.buffered.end(audioElement.buffered.length - 1)
-            : 0;
+    const driftThreshold = 0.3;
+    const syncInterval = 300;
 
-        if (audioEnd - videoElement.currentTime >= 0.5 && !videoElement.paused && !audioElement.paused) {
-            const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
-            if (drift > 0.1) audioElement.currentTime = videoElement.currentTime;
+    const sync = throttle(() => {
+        if (videoElement.paused || audioElement.paused) return;
+
+        const videoTime = videoElement.currentTime;
+        const audioTime = audioElement.currentTime;
+        const drift = videoTime - audioTime;
+
+        if (Math.abs(drift) > driftThreshold) {
+            // Check if audio buffer is sufficient before correcting
+            const audioEnd = audioElement.buffered.length
+                ? audioElement.buffered.end(audioElement.buffered.length - 1)
+                : 0;
+            const bufferLead = audioEnd - videoTime;
+
+            const minBufferLead = 2.0;
+
+            if (bufferLead >= minBufferLead) {
+                audioElement.currentTime = videoTime;
+            }
         }
-    }, 200);
+    }, syncInterval);
 
     videoElement.removeEventListener('timeupdate', sync);
     videoElement.addEventListener('timeupdate', sync);
@@ -509,14 +523,15 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
         return;
     }
 
-    // Wait until audio has at least 3s buffered ahead of video
+    // Wait until audio has sufficient buffer ahead of video
+    const requiredBuffer = 6;
     await new Promise(resolve => {
         const check = () => {
             const audioEnd = audioEl.buffered.length
                 ? audioEl.buffered.end(audioEl.buffered.length - 1)
                 : 0;
 
-            if (audioEnd - videoEl.currentTime >= 3) return resolve();
+            if (audioEnd - videoEl.currentTime >= requiredBuffer) return resolve();
             requestAnimationFrame(check);
         };
         check();
