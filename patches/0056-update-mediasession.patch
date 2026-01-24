@@ -1,0 +1,61 @@
+From 4312fe8db0c021304bcc6ef966c07ebea9a12cc3 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 24 Jan 2026 10:32:05 +0300
+Subject: [PATCH] update mediasession
+
+---
+ html/static/js/player.js | 35 +++++++++++++++++++++++++++--------
+ 1 file changed, 27 insertions(+), 8 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index bf4a8f7..a972337 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -772,17 +772,36 @@ document.addEventListener("keydown", async (event) => {
+ }, true); // capture phase: critical for gesture detection
+ 
+ 
+-if ('mediaSession' in navigator) {
+-    navigator.mediaSession.metadata = new MediaMetadata({
+-        title: 'Video Title',
+-        artist: 'Artist Name',
+-        album: 'Album Name',
+-    });
++// MediaSession
++function updateMediaSession() {
++  if (!('mediaSession' in navigator)) return;
++
++  navigator.mediaSession.metadata = null;
++  navigator.mediaSession.metadata = new MediaMetadata({
++    title: data?.title || document.title,
++    artist: data?.author || ''
++  });
++  navigator.mediaSession.playbackState = videoElement.paused ? 'paused' : 'playing';
++}
++
++// Claim on meaningful events only
++['play','pause','loadedmetadata','canplay','seeked'].forEach(e =>
++  videoElement.addEventListener(e, updateMediaSession)
++);
++
++// Override on format/quality switches
++const _origPlay = formatLoader.play.bind(formatLoader);
++formatLoader.play = (...args) => { _origPlay(...args); requestAnimationFrame(updateMediaSession); };
+ 
+-    navigator.mediaSession.setActionHandler('play', togglePlaying);
+-    navigator.mediaSession.setActionHandler('pause', togglePlaying);
++// Media keys scoped to this tab
++if ('mediaSession' in navigator) {
++  navigator.mediaSession.setActionHandler('play', togglePlaying);
++  navigator.mediaSession.setActionHandler('pause', togglePlaying);
+ }
+ 
++// Initial claim
++updateMediaSession();
++
+ videoElement.setAttribute('preload', 'metadata');
+ //audioElement.setAttribute('preload', 'metadata');
+ 
+-- 
+2.52.0
+
