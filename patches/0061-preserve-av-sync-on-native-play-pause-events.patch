@@ -1,0 +1,40 @@
+From 507960ed7e77f7ab4778e377d9f9ff4ab6847948 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 28 Jan 2026 19:20:52 +0300
+Subject: [PATCH] preserve av sync on native play/pause events
+
+---
+ html/static/js/player.js | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 04a7811..a63a19f 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -492,6 +492,16 @@ function playbackIntervention(event) {
+     // Prevent race while media is buffering or not ready
+     if (target.readyState < 2) return;
+ 
++    // Ensure audio follows video on native play/pause
++    if (target === videoElement) {
++        if (event.type === "play" && formatLoader.npa && audioElement.paused) {
++            audioElement.currentTime = videoElement.currentTime;
++            audioElement.play().catch(() => {});
++        } else if (event.type === "pause" && formatLoader.npa && !audioElement.paused) {
++            audioElement.pause();
++        }
++    }
++
+     // Sync audio for manual seeks
+     if (audioElement.src && !ignoreNext[event.type]--) {
+         if (event.type === "seeked") {
+@@ -848,4 +858,4 @@ document.addEventListener('click', async (event) => {
+ 
+     videoElement.addEventListener('seeked', () =>
+         setTimeout(() => userSeeking = false, 300), { once: true });
+-});
++});
+\ No newline at end of file
+-- 
+2.52.0
+

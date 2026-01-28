@@ -1,0 +1,38 @@
+From 717bfeb281e90b88a4865849fac410c98b9113a0 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 28 Jan 2026 21:54:40 +0300
+Subject: [PATCH] remove stutters/buffer caused by click event
+
+---
+ html/static/js/player.js | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index a63a19f..240c5ee 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -214,9 +214,18 @@ async function loadMediaWithRetry(mediaElement, url, retries = 6) {
+ 
+ function alignStreams() {
+     if (!audioElement.src || !videoElement.src) return;
+-    const t = Math.max(audioElement.currentTime || 0, videoElement.currentTime || 0);
+-    audioElement.currentTime = t;
+-    videoElement.currentTime = t;
++
++    const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
++    if (drift < 0.2) return;
++
++    const t = (!videoElement.paused && !audioElement.paused && drift < 0.5)
++        ? null
++        : Math.max(videoElement.currentTime, audioElement.currentTime);
++
++    if (t !== null) {
++        audioElement.currentTime = t;
++        videoElement.currentTime = t;
++    }
+ }
+ 
+ 
+-- 
+2.52.0
+

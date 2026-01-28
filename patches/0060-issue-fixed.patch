@@ -1,0 +1,24 @@
+From d71ce5c3db60420663d5fe9abdd1218edf98c472 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 24 Jan 2026 17:40:18 +0300
+Subject: [PATCH] issue fixed
+
+---
+ README.md | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index e2ea5ea..bc64c3c 100644
+--- a/README.md
++++ b/README.md
+@@ -15,7 +15,6 @@ Features added:
+ 
+ Notes:
+ - Requires a WORKING invidious instance.
+-- Media playback on Firefox no good (as of Jan 2026).
+ 
+ <details>
+ <summary>Show Original README</summary>
+-- 
+2.52.0
+
