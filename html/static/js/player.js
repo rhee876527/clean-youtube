@@ -492,6 +492,16 @@ function playbackIntervention(event) {
     // Prevent race while media is buffering or not ready
     if (target.readyState < 2) return;
 
+    // Ensure audio follows video on native play/pause
+    if (target === videoElement) {
+        if (event.type === "play" && formatLoader.npa && audioElement.paused) {
+            audioElement.currentTime = videoElement.currentTime;
+            audioElement.play().catch(() => {});
+        } else if (event.type === "pause" && formatLoader.npa && !audioElement.paused) {
+            audioElement.pause();
+        }
+    }
+
     // Sync audio for manual seeks
     if (audioElement.src && !ignoreNext[event.type]--) {
         if (event.type === "seeked") {
