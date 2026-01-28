@@ -214,9 +214,18 @@ async function loadMediaWithRetry(mediaElement, url, retries = 6) {
 
 function alignStreams() {
     if (!audioElement.src || !videoElement.src) return;
-    const t = Math.max(audioElement.currentTime || 0, videoElement.currentTime || 0);
-    audioElement.currentTime = t;
-    videoElement.currentTime = t;
+
+    const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+    if (drift < 0.2) return;
+
+    const t = (!videoElement.paused && !audioElement.paused && drift < 0.5)
+        ? null
+        : Math.max(videoElement.currentTime, audioElement.currentTime);
+
+    if (t !== null) {
+        audioElement.currentTime = t;
+        videoElement.currentTime = t;
+    }
 }
 
 
