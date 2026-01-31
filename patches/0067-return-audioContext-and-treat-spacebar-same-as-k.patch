@@ -1,0 +1,43 @@
+From 5584044d556fb0dd9588b19ebffbd5eddc3f104e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 31 Jan 2026 13:53:44 +0300
+Subject: [PATCH] return audioContext and treat spacebar same as k
+
+---
+ html/static/js/player.js | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 5345937..190cbd0 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -257,6 +257,8 @@ document.addEventListener("click", () => {
+     pipReady = true;
+ });
+ 
++const audioContext = new AudioContext();
++
+ class FormatLoader {
+     constructor() {
+         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
+@@ -680,6 +682,8 @@ const debouncedPlayVideo = debounce(async () => {
+     if (!videoElement.paused) return;
+ 
+     try {
++        if (audioContext.state === 'suspended') await audioContext.resume();
++
+         if (formatLoader.npa) {
+             await waitForAudioThenPlay(videoElement, audioElement);
+         } else {
+@@ -759,7 +763,7 @@ document.addEventListener("keydown", async (event) => {
+         return;
+     }
+ 
+-    if (event.key === "k") {
++    if (event.key === "k" || event.key === " ") {
+         event.preventDefault();
+ 
+         // Track last interaction so other logic (like spacebar) sees a gesture
+-- 
+2.52.0
+
