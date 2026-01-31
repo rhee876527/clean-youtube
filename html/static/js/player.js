@@ -257,8 +257,6 @@ document.addEventListener("click", () => {
     pipReady = true;
 });
 
-const audioContext = new AudioContext();
-
 class FormatLoader {
     constructor() {
         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
@@ -435,8 +433,6 @@ class QualitySelect extends ElemJS {
 
 new QualitySelect();
 
-const ignoreNext = { play: 0 };
-
 // Throttle media sync
 function throttle(func, delay) {
     let last = 0;
@@ -512,7 +508,7 @@ function playbackIntervention(event) {
     }
 
     // Sync audio for manual seeks
-    if (audioElement.src && !ignoreNext[event.type]--) {
+    if (audioElement.src) {
         if (event.type === "seeked") {
             const targetTime = target.currentTime;
             other.currentTime = targetTime;
@@ -684,14 +680,14 @@ const debouncedPlayVideo = debounce(async () => {
     if (!videoElement.paused) return;
 
     try {
-        if (audioContext.state === 'suspended') await audioContext.resume();
-
-        if (formatLoader.npa) await waitForAudioThenPlay(videoElement, audioElement);
-        else await videoElement.play();
+        if (formatLoader.npa) {
+            await waitForAudioThenPlay(videoElement, audioElement);
+        } else {
+            await videoElement.play();
+        }
     } catch (err) {
         if (err.name === 'AbortError') {
-            // Expected during rapid seeks — silent ignore
-            return;
+            return; // Expected during rapid seeks — silent ignore
         }
         console.error("Playback failed:", err);
     }
@@ -841,13 +837,9 @@ videoElement.setAttribute('preload', 'metadata');
 
 new SubscribeButton(q("#subscribe"));
 
-let userSeeking = false;
-
 // Helper function to seek to timestamp
 async function seekToTimestamp(time, href = null) {
     if (isNaN(time)) return;
-
-    userSeeking = true;
 
     // Set times
     videoElement.currentTime = time;
@@ -862,9 +854,6 @@ async function seekToTimestamp(time, href = null) {
     if (href) {
         window.history.replaceState(null, '', href);
     }
-
-    videoElement.addEventListener('seeked', () =>
-        setTimeout(() => userSeeking = false, 300), { once: true });
 }
 
 // Handle clicks on timestamps in page content (descriptions, etc.)
