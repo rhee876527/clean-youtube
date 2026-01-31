@@ -257,6 +257,8 @@ document.addEventListener("click", () => {
     pipReady = true;
 });
 
+const audioContext = new AudioContext();
+
 class FormatLoader {
     constructor() {
         this.npv = videoFormats.get(videoElement.getAttribute("data-itag"));
@@ -680,6 +682,8 @@ const debouncedPlayVideo = debounce(async () => {
     if (!videoElement.paused) return;
 
     try {
+        if (audioContext.state === 'suspended') await audioContext.resume();
+
         if (formatLoader.npa) {
             await waitForAudioThenPlay(videoElement, audioElement);
         } else {
@@ -759,7 +763,7 @@ document.addEventListener("keydown", async (event) => {
         return;
     }
 
-    if (event.key === "k") {
+    if (event.key === "k" || event.key === " ") {
         event.preventDefault();
 
         // Track last interaction so other logic (like spacebar) sees a gesture
