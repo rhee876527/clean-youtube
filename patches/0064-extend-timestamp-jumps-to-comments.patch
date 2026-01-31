@@ -1,0 +1,126 @@
+From f764661a8a9b11b64970a3c3b4a87fe813be2dba Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 31 Jan 2026 10:58:08 +0300
+Subject: [PATCH] extend timestamp jumps to comments
+
+---
+ html/static/js/comments.js | 49 ++++++++++++++++++++++++++++++++++++++
+ html/static/js/player.js   | 36 ++++++++++++++++++++++------
+ 2 files changed, 78 insertions(+), 7 deletions(-)
+
+diff --git a/html/static/js/comments.js b/html/static/js/comments.js
+index 936832d..b026fd1 100644
+--- a/html/static/js/comments.js
++++ b/html/static/js/comments.js
+@@ -99,3 +99,52 @@ function escapeHtml(text) {
+ 	div.textContent = text;
+ 	return div.innerHTML;
+ }
++
++// Handle timestamp clicks in comments (from contentHtml)
++function setupTimestampHandlers(container = document) {
++	// Handle both data-clickable-timestamp and data-jump-time attributes
++	container.querySelectorAll('[data-clickable-timestamp], [data-jump-time]').forEach(link => {
++		link.addEventListener('click', async (e) => {
++			// Only prevent default if it has one of our timestamp attributes
++			const time = parseFloat(
++				link.getAttribute('data-clickable-timestamp') ||
++				link.getAttribute('data-jump-time')
++			);
++			if (isNaN(time)) return;
++
++			e.preventDefault();
++			e.stopPropagation();
++
++			// Dispatch custom event that player.js can listen to
++			const event = new CustomEvent('seekToTimestamp', {
++				detail: { time, link }
++			});
++			document.dispatchEvent(event);
++		});
++	});
++}
++
++// Set up timestamp handlers on initial load
++setupTimestampHandlers();
++
++// Also set up handlers for dynamically loaded replies
++const observerConfig = {
++	childList: true,
++	subtree: true
++};
++
++const observer = new MutationObserver((mutations) => {
++	mutations.forEach((mutation) => {
++		mutation.addedNodes.forEach((node) => {
++			if (node.nodeType === 1) { // Element node
++				setupTimestampHandlers(node);
++			}
++		});
++	});
++});
++
++// Observe the comments section for changes
++const commentsSection = document.querySelector('.comments-section');
++if (commentsSection) {
++	observer.observe(commentsSection, observerConfig);
++}
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 240c5ee..6c8a1ea 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -843,12 +843,8 @@ new SubscribeButton(q("#subscribe"));
+ 
+ let userSeeking = false;
+ 
+-document.addEventListener('click', async (event) => {
+-    const timestampEl = event.target.closest('[data-clickable-timestamp]');
+-    if (!timestampEl) return;
+-
+-    event.preventDefault();
+-    const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
++// Helper function to seek to timestamp
++async function seekToTimestamp(time, href = null) {
+     if (isNaN(time)) return;
+ 
+     userSeeking = true;
+@@ -863,8 +859,34 @@ document.addEventListener('click', async (event) => {
+         await waitForAudioThenPlay(videoElement, audioElement);
+     }
+ 
+-    window.history.replaceState(null, '', timestampEl.href);
++    if (href) {
++        window.history.replaceState(null, '', href);
++    }
+ 
+     videoElement.addEventListener('seeked', () =>
+         setTimeout(() => userSeeking = false, 300), { once: true });
++}
++
++// Handle clicks on timestamps in page content (descriptions, etc.)
++document.addEventListener('click', async (event) => {
++    const timestampEl = (event.target instanceof Element) ? event.target.closest('[data-clickable-timestamp], [data-jump-time]') : null;
++    if (!timestampEl) return;
++
++    const time = parseFloat(
++        timestampEl.getAttribute('data-clickable-timestamp') ||
++        timestampEl.getAttribute('data-jump-time') || '0'
++    );
++    if (isNaN(time)) return;
++
++    event.preventDefault();
++    const href = timestampEl instanceof HTMLAnchorElement ? timestampEl.href : null;
++    await seekToTimestamp(time, href);
++});
++
++// Handle custom event from comments seeking to timestamps
++document.addEventListener('seekToTimestamp', async (event) => {
++    const eventData = event['detail'] || {};
++    const { time, link } = eventData;
++    const href = link instanceof HTMLAnchorElement ? link.href : null;
++    await seekToTimestamp(time, href);
+ });
+\ No newline at end of file
+-- 
+2.52.0
+
