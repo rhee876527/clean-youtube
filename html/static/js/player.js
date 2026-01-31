@@ -728,7 +728,6 @@ videoElement.addEventListener("pointerdown", () => {
 videoElement.addEventListener("click", (event) => {
     event.preventDefault();
     togglePlaying();
-    videoElement.lastInteraction = Date.now(); // Track last click
     videoElement.focus();
 });
 
@@ -766,9 +765,6 @@ document.addEventListener("keydown", async (event) => {
     if (event.key === "k" || event.key === " ") {
         event.preventDefault();
 
-        // Track last interaction so other logic (like spacebar) sees a gesture
-        videoElement.lastInteraction = Date.now();
-
         // Attempt to play video and audio
         try {
             if (videoElement.paused) {
@@ -791,17 +787,11 @@ document.addEventListener("keydown", async (event) => {
         return; // prevent further handling
     }
 
+    // Other key actions
     const action = keyActions.get(event.key);
     if (action) {
-        if (event.key === " ") {
-            const isActive = document.activeElement === videoElement;
-            const recentlyClicked = Date.now() - (videoElement.lastInteraction || 0) < 15000;
-            if (!isActive && !recentlyClicked) return;
-            event.preventDefault();
-        }
-
-        action();
         event.preventDefault();
+        action();
     }
 }, true); // capture phase: critical for gesture detection
 
