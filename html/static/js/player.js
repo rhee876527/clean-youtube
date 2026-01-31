@@ -843,12 +843,8 @@ new SubscribeButton(q("#subscribe"));
 
 let userSeeking = false;
 
-document.addEventListener('click', async (event) => {
-    const timestampEl = event.target.closest('[data-clickable-timestamp]');
-    if (!timestampEl) return;
-
-    event.preventDefault();
-    const time = parseFloat(timestampEl.getAttribute('data-clickable-timestamp'));
+// Helper function to seek to timestamp
+async function seekToTimestamp(time, href = null) {
     if (isNaN(time)) return;
 
     userSeeking = true;
@@ -863,8 +859,34 @@ document.addEventListener('click', async (event) => {
         await waitForAudioThenPlay(videoElement, audioElement);
     }
 
-    window.history.replaceState(null, '', timestampEl.href);
+    if (href) {
+        window.history.replaceState(null, '', href);
+    }
 
     videoElement.addEventListener('seeked', () =>
         setTimeout(() => userSeeking = false, 300), { once: true });
+}
+
+// Handle clicks on timestamps in page content (descriptions, etc.)
+document.addEventListener('click', async (event) => {
+    const timestampEl = (event.target instanceof Element) ? event.target.closest('[data-clickable-timestamp], [data-jump-time]') : null;
+    if (!timestampEl) return;
+
+    const time = parseFloat(
+        timestampEl.getAttribute('data-clickable-timestamp') ||
+        timestampEl.getAttribute('data-jump-time') || '0'
+    );
+    if (isNaN(time)) return;
+
+    event.preventDefault();
+    const href = timestampEl instanceof HTMLAnchorElement ? timestampEl.href : null;
+    await seekToTimestamp(time, href);
+});
+
+// Handle custom event from comments seeking to timestamps
+document.addEventListener('seekToTimestamp', async (event) => {
+    const eventData = event['detail'] || {};
+    const { time, link } = eventData;
+    const href = link instanceof HTMLAnchorElement ? link.href : null;
+    await seekToTimestamp(time, href);
 });

@@ -99,3 +99,52 @@ function escapeHtml(text) {
 	div.textContent = text;
 	return div.innerHTML;
 }
+
+// Handle timestamp clicks in comments (from contentHtml)
+function setupTimestampHandlers(container = document) {
+	// Handle both data-clickable-timestamp and data-jump-time attributes
+	container.querySelectorAll('[data-clickable-timestamp], [data-jump-time]').forEach(link => {
+		link.addEventListener('click', async (e) => {
+			// Only prevent default if it has one of our timestamp attributes
+			const time = parseFloat(
+				link.getAttribute('data-clickable-timestamp') ||
+				link.getAttribute('data-jump-time')
+			);
+			if (isNaN(time)) return;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			// Dispatch custom event that player.js can listen to
+			const event = new CustomEvent('seekToTimestamp', {
+				detail: { time, link }
+			});
+			document.dispatchEvent(event);
+		});
+	});
+}
+
+// Set up timestamp handlers on initial load
+setupTimestampHandlers();
+
+// Also set up handlers for dynamically loaded replies
+const observerConfig = {
+	childList: true,
+	subtree: true
+};
+
+const observer = new MutationObserver((mutations) => {
+	mutations.forEach((mutation) => {
+		mutation.addedNodes.forEach((node) => {
+			if (node.nodeType === 1) { // Element node
+				setupTimestampHandlers(node);
+			}
+		});
+	});
+});
+
+// Observe the comments section for changes
+const commentsSection = document.querySelector('.comments-section');
+if (commentsSection) {
+	observer.observe(commentsSection, observerConfig);
+}
