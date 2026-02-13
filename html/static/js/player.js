@@ -651,6 +651,22 @@ function resumeWhenBuffered() {
     }
 }
 
+document.addEventListener("visibilitychange", () => {
+    if (!formatLoader.npa) return;
+
+    if (!document.hidden) {
+        if (!videoElement.paused) {
+            freezePlayback = true;
+            shouldResume = true;
+
+            videoElement.pause();
+            audioElement.pause();
+
+            resumeWhenBuffered();
+        }
+    }
+});
+
 videoElement.addEventListener("seeking", () => {
     requestAnimationFrame(resumeWhenBuffered)
 })
