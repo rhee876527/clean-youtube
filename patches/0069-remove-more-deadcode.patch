@@ -1,0 +1,54 @@
+From 9dd67b2d83d8fef066cff8292d8afad61d548da2 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 31 Jan 2026 16:23:28 +0300
+Subject: [PATCH] remove more deadcode
+
+---
+ html/static/js/player.js | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 190cbd0..806dbdb 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -728,7 +728,6 @@ videoElement.addEventListener("pointerdown", () => {
+ videoElement.addEventListener("click", (event) => {
+     event.preventDefault();
+     togglePlaying();
+-    videoElement.lastInteraction = Date.now(); // Track last click
+     videoElement.focus();
+ });
+ 
+@@ -766,9 +765,6 @@ document.addEventListener("keydown", async (event) => {
+     if (event.key === "k" || event.key === " ") {
+         event.preventDefault();
+ 
+-        // Track last interaction so other logic (like spacebar) sees a gesture
+-        videoElement.lastInteraction = Date.now();
+-
+         // Attempt to play video and audio
+         try {
+             if (videoElement.paused) {
+@@ -791,17 +787,11 @@ document.addEventListener("keydown", async (event) => {
+         return; // prevent further handling
+     }
+ 
++    // Other key actions
+     const action = keyActions.get(event.key);
+     if (action) {
+-        if (event.key === " ") {
+-            const isActive = document.activeElement === videoElement;
+-            const recentlyClicked = Date.now() - (videoElement.lastInteraction || 0) < 15000;
+-            if (!isActive && !recentlyClicked) return;
+-            event.preventDefault();
+-        }
+-
+-        action();
+         event.preventDefault();
++        action();
+     }
+ }, true); // capture phase: critical for gesture detection
+ 
+-- 
+2.53.0
+

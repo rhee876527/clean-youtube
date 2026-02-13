@@ -39,5 +39,5 @@ index 5345937..190cbd0 100644
  
          // Track last interaction so other logic (like spacebar) sees a gesture
 -- 
-2.52.0
+2.53.0
 

@@ -81,5 +81,5 @@ index 5189537..936832d 100644
  			const plural = replyCount === 1 ? 'reply' : 'replies';
  			replyCountEl.textContent = `${replyCount} ${plural}`;
 -- 
-2.52.0
+2.53.0
 

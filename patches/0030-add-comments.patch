@@ -348,5 +348,5 @@ index 6774a83..abb68ee 100644
 +    color: map.get($_theme, "text-1")
 +    background-color: map.get($_theme, "bg-4")
 -- 
-2.52.0
+2.53.0
 

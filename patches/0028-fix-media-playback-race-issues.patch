@@ -88,5 +88,5 @@ index 887a1bb..4f02dba 100644
  function togglePlaying() {
      if (videoElement.paused) {
 -- 
-2.52.0
+2.53.0
 

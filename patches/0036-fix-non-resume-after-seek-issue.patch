@@ -46,5 +46,5 @@ index ad87e89..ad24b52 100644
      if (!freezePlayback || !shouldResume) return;
  
 -- 
-2.52.0
+2.53.0
 

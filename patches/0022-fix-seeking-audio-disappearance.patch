@@ -26,5 +26,5 @@ index 94c18e9..59a8662 100644
  const keyActions = new Map([
      ["j", () => relativeSeek(-10)],
 -- 
-2.52.0
+2.53.0
 

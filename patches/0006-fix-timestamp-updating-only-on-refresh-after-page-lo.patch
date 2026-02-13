@@ -28,5 +28,5 @@ index 8446b1d..2f14e49 100644
      function parseXtags(url) {
          const urlParams = new URLSearchParams(url.split('?')[1] ?? '');
 -- 
-2.52.0
+2.53.0
 

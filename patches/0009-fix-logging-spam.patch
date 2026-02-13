@@ -20,5 +20,5 @@ index d87ecd3..194cf81 100644
  	if (currentChapter !== lastChapter) {
  		if (lastChapter) lastChapter.link.removeClass("timestamp--active")
 -- 
-2.52.0
+2.53.0
 

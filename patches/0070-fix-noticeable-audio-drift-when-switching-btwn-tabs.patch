@@ -1,0 +1,39 @@
+From 5996ab89a533c79306652f27df407f4274f73b7e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 13 Feb 2026 14:03:23 +0300
+Subject: [PATCH] fix noticeable audio drift when switching btwn tabs
+
+---
+ html/static/js/player.js | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 806dbdb..75e9521 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -651,6 +651,22 @@ function resumeWhenBuffered() {
+     }
+ }
+ 
++document.addEventListener("visibilitychange", () => {
++    if (!formatLoader.npa) return;
++
++    if (!document.hidden) {
++        if (!videoElement.paused) {
++            freezePlayback = true;
++            shouldResume = true;
++
++            videoElement.pause();
++            audioElement.pause();
++
++            resumeWhenBuffered();
++        }
++    }
++});
++
+ videoElement.addEventListener("seeking", () => {
+     requestAnimationFrame(resumeWhenBuffered)
+ })
+-- 
+2.53.0
+

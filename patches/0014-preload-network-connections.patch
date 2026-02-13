@@ -81,5 +81,5 @@ index e370be0..69e80e8 100644
  
  document.addEventListener("visibilitychange", async () => {
 -- 
-2.52.0
+2.53.0
 
