@@ -757,6 +757,8 @@ videoElement.addEventListener("seeking", () => {
 });
 
 // âœ… Capture spacebar early and forcefully
+let isPlaybackActionPending = false;
+
 const keyActions = new Map([
     ["j", () => relativeSeek(-10)],
     ["n", () => relativeSeek(-10)],
@@ -781,11 +783,32 @@ document.addEventListener("keydown", async (event) => {
     if (event.key === "k" || event.key === " ") {
         event.preventDefault();
 
+        // Prevent multiple simultaneous playback attempts
+        if (isPlaybackActionPending) {
+            return; // Skip if already processing a playback action
+        }
+
+        isPlaybackActionPending = true;
+
+        // Check if both elements are ready before attempting playback
+        if (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2)) {
+            console.log("Media not ready, skipping playback attempt");
+            isPlaybackActionPending = false;
+            return; // prevent further handling but don't play
+        }
+
         // Attempt to play video and audio
         try {
             if (videoElement.paused) {
-                await videoElement.play(); // counts as user gesture
-                if (audioElement.src && playManagers.audio.isActive()) {
+                if (formatLoader.npa) {
+                    // For video+audio, use the alignment-aware playback
+                    await waitForAudioThenPlay(videoElement, audioElement);
+                } else {
+                    // For video-only, play directly
+                    await videoElement.play(); // counts as user gesture
+                }
+
+                if (audioElement.src && playManagers.audio.isActive() && formatLoader.npa) {
                     try {
                         await audioElement.play();
                     } catch (e) {
@@ -798,6 +821,9 @@ document.addEventListener("keydown", async (event) => {
             }
         } catch (e) {
             console.warn("Playback blocked by browser:", e);
+        } finally {
+            // Reset the flag regardless of success or failure
+            isPlaybackActionPending = false;
         }
 
         return; // prevent further handling
