@@ -534,6 +534,7 @@ function playbackIntervention(event) {
 }
 
 async function waitForAudioThenPlay(videoEl, audioEl) {
+    if (!userInteracted) return;
     if (videoEl.paused === false) return;
     if (!formatLoader.npa) {
         await videoEl.play();
@@ -616,8 +617,10 @@ videoElement.addEventListener("playing", () => {
 let freezePlayback = false
 let shouldResume = false
 
+
 videoElement.addEventListener("seeking", async () => {
     if (!formatLoader.npa) return;
+    if (!userInteracted) return;
 
     freezePlayback = true;
     shouldResume = !videoElement.paused;
@@ -884,7 +887,9 @@ async function seekToTimestamp(time, href = null) {
         audioElement.src = formatLoader.npa.url;
         audioElement.load();
         audioElement.currentTime = time;
-        await waitForAudioThenPlay(videoElement, audioElement);
+        if (userInteracted) {
+            await waitForAudioThenPlay(videoElement, audioElement);
+        }
     }
 
     if (href) {
