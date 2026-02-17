@@ -674,8 +674,12 @@ videoElement.addEventListener("seeking", () => {
 // Drift detection and correction during playback
 let lastBufferCheck = 0; // track last throttled check
 
+// Skip non-chrome
+const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
+
 videoElement.addEventListener("timeupdate", async () => {
     if (!formatLoader.npa) return;
+    if (!isChrome) return;
     if (freezePlayback) return;
 
     const now = performance.now();
