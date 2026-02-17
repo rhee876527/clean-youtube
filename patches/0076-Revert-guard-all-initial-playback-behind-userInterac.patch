@@ -1,0 +1,47 @@
+From 1b97479798da470ae13d25416aea7d327674af44 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 17 Feb 2026 12:31:16 +0300
+Subject: [PATCH] Revert "guard all initial playback behind userInteracted"
+
+This reverts commit c44504eac086305fc69c1416a3c807b6f9eca3f9.
+---
+ html/static/js/player.js | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index f6721a7..820cc9a 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -534,7 +534,6 @@ function playbackIntervention(event) {
+ }
+ 
+ async function waitForAudioThenPlay(videoEl, audioEl) {
+-    if (!userInteracted) return;
+     if (videoEl.paused === false) return;
+     if (!formatLoader.npa) {
+         await videoEl.play();
+@@ -617,10 +616,8 @@ videoElement.addEventListener("playing", () => {
+ let freezePlayback = false
+ let shouldResume = false
+ 
+-
+ videoElement.addEventListener("seeking", async () => {
+     if (!formatLoader.npa) return;
+-    if (!userInteracted) return;
+ 
+     freezePlayback = true;
+     shouldResume = !videoElement.paused;
+@@ -931,9 +928,7 @@ async function seekToTimestamp(time, href = null) {
+         audioElement.src = formatLoader.npa.url;
+         audioElement.load();
+         audioElement.currentTime = time;
+-        if (userInteracted) {
+-            await waitForAudioThenPlay(videoElement, audioElement);
+-        }
++        await waitForAudioThenPlay(videoElement, audioElement);
+     }
+ 
+     if (href) {
+-- 
+2.53.0
+
