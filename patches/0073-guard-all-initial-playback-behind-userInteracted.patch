@@ -1,0 +1,46 @@
+From c44504eac086305fc69c1416a3c807b6f9eca3f9 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 17 Feb 2026 11:45:51 +0300
+Subject: [PATCH] guard all initial playback behind userInteracted
+
+---
+ html/static/js/player.js | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 0778d4b..622b2c3 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -534,6 +534,7 @@ function playbackIntervention(event) {
+ }
+ 
+ async function waitForAudioThenPlay(videoEl, audioEl) {
++    if (!userInteracted) return;
+     if (videoEl.paused === false) return;
+     if (!formatLoader.npa) {
+         await videoEl.play();
+@@ -616,8 +617,10 @@ videoElement.addEventListener("playing", () => {
+ let freezePlayback = false
+ let shouldResume = false
+ 
++
+ videoElement.addEventListener("seeking", async () => {
+     if (!formatLoader.npa) return;
++    if (!userInteracted) return;
+ 
+     freezePlayback = true;
+     shouldResume = !videoElement.paused;
+@@ -884,7 +887,9 @@ async function seekToTimestamp(time, href = null) {
+         audioElement.src = formatLoader.npa.url;
+         audioElement.load();
+         audioElement.currentTime = time;
+-        await waitForAudioThenPlay(videoElement, audioElement);
++        if (userInteracted) {
++            await waitForAudioThenPlay(videoElement, audioElement);
++        }
+     }
+ 
+     if (href) {
+-- 
+2.53.0
+
