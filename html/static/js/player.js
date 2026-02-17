@@ -674,6 +674,50 @@ videoElement.addEventListener("seeking", () => {
     requestAnimationFrame(resumeWhenBuffered)
 })
 
+// Drift detection and correction during playback
+let lastBufferCheck = 0; // track last throttled check
+
+videoElement.addEventListener("timeupdate", async () => {
+    if (!formatLoader.npa) return;
+    if (freezePlayback) return;
+
+    const now = performance.now();
+    const throttleInterval = 250;
+    if (now - lastBufferCheck < throttleInterval) return;
+    lastBufferCheck = now;
+
+    const drift = videoElement.currentTime - audioElement.currentTime;
+
+    if (audioElement.readyState < 2 || drift > 0.1) {
+        freezePlayback = true;
+        shouldResume = !videoElement.paused;
+
+        if (!videoElement.paused) videoElement.pause();
+        if (!audioElement.paused) audioElement.pause();
+
+        const checkBuffer = () => {
+            const audioEnd = audioElement.buffered.length
+                ? audioElement.buffered.end(audioElement.buffered.length - 1)
+                : 0;
+
+            if (audioElement.readyState >= 2 && audioEnd - videoElement.currentTime >= 0) {
+                audioElement.currentTime = videoElement.currentTime;
+
+                if (shouldResume) {
+                    audioElement.play().catch(() => {});
+                    videoElement.play().catch(() => {});
+                }
+
+                freezePlayback = false;
+                shouldResume = false;
+            } else {
+                setTimeout(checkBuffer, throttleInterval);
+            }
+        };
+        checkBuffer();
+    }
+});
+
 
 const videoObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
