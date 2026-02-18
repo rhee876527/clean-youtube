@@ -78,8 +78,10 @@ class Refresher {
 
 	refreshChannel(ucid) {
 		return fetch(`${constants.server_setup.local_instance_origin}/api/v1/channels/${ucid}/latest`).then(res => res.json()).then(/** @param {any} root */ root => {
-			if (Array.isArray(root)) {
-				root.forEach(video => {
+			// Handle both old API format (array at root) and new format ({videos: [...]})
+			const videos = Array.isArray(root) ? root : (root.videos || [])
+			if (videos.length > 0) {
+				videos.forEach(video => {
 					// organise
 					video.descriptionHtml = video.descriptionHtml.replace(/<a /g, '<a tabindex="-1" ') // should be safe
 					video.viewCountText = null //TODO?
@@ -88,7 +90,7 @@ class Refresher {
 				})
 				// update channel refreshed
 				prepared.channel_refreshed_update.run(Date.now(), ucid)
-				// console.log(`updated ${root.length} videos for channel ${ucid}`)
+				// console.log(`updated ${videos.length} videos for channel ${ucid}`)
 			} else if (root.identifier === "PUBLISHED_DATES_NOT_PROVIDED") {
 				// nothing we can do. skip this iteration.
 			} else if (root.identifier === "NOT_FOUND") {
