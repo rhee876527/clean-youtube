@@ -672,52 +672,30 @@ videoElement.addEventListener("seeking", () => {
 })
 
 // Drift detection and correction during playback
-let lastBufferCheck = 0; // track last throttled check
 
 // Skip non-chrome
 const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
 
-videoElement.addEventListener("timeupdate", async () => {
-    if (!formatLoader.npa) return;
-    if (!isChrome) return;
-    if (freezePlayback) return;
+const driftThreshold = 0.15;
+const minBufferLead = 2.0;
 
-    const now = performance.now();
-    const throttleInterval = 250;
-    if (now - lastBufferCheck < throttleInterval) return;
-    lastBufferCheck = now;
+const checkDriftThrottled = throttle(() => {
+    if (!formatLoader.npa || !isChrome || freezePlayback) return;
 
     const drift = videoElement.currentTime - audioElement.currentTime;
 
-    if (audioElement.readyState < 2 || drift > 0.1) {
-        freezePlayback = true;
-        shouldResume = !videoElement.paused;
+    const audioEnd = audioElement.buffered.length
+        ? audioElement.buffered.end(audioElement.buffered.length - 1)
+        : 0;
 
-        if (!videoElement.paused) videoElement.pause();
-        if (!audioElement.paused) audioElement.pause();
-
-        const checkBuffer = () => {
-            const audioEnd = audioElement.buffered.length
-                ? audioElement.buffered.end(audioElement.buffered.length - 1)
-                : 0;
-
-            if (audioElement.readyState >= 2 && audioEnd - videoElement.currentTime >= 0) {
-                audioElement.currentTime = videoElement.currentTime;
-
-                if (shouldResume) {
-                    audioElement.play().catch(() => {});
-                    videoElement.play().catch(() => {});
-                }
-
-                freezePlayback = false;
-                shouldResume = false;
-            } else {
-                setTimeout(checkBuffer, throttleInterval);
-            }
-        };
-        checkBuffer();
+    if (audioElement.readyState >= 3 &&
+        (audioEnd - videoElement.currentTime) >= minBufferLead &&
+        Math.abs(drift) > driftThreshold) {
+        audioElement.currentTime = videoElement.currentTime;
     }
-});
+}, 250);
+
+videoElement.addEventListener("timeupdate", checkDriftThrottled);
 
 
 const videoObserver = new IntersectionObserver((entries) => {
