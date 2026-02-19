@@ -1,0 +1,83 @@
+From f95794a114d33da6c4a4b628ec27c94cb987c92e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Fri, 20 Feb 2026 00:02:50 +0300
+Subject: [PATCH] improve polling and drift correction
+
+---
+ html/static/js/player.js | 50 +++++++++++-----------------------------
+ 1 file changed, 14 insertions(+), 36 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 4314a52..a8c5bf5 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -672,52 +672,30 @@ videoElement.addEventListener("seeking", () => {
+ })
+ 
+ // Drift detection and correction during playback
+-let lastBufferCheck = 0; // track last throttled check
+ 
+ // Skip non-chrome
+ const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
+ 
+-videoElement.addEventListener("timeupdate", async () => {
+-    if (!formatLoader.npa) return;
+-    if (!isChrome) return;
+-    if (freezePlayback) return;
++const driftThreshold = 0.15;
++const minBufferLead = 2.0;
+ 
+-    const now = performance.now();
+-    const throttleInterval = 250;
+-    if (now - lastBufferCheck < throttleInterval) return;
+-    lastBufferCheck = now;
++const checkDriftThrottled = throttle(() => {
++    if (!formatLoader.npa || !isChrome || freezePlayback) return;
+ 
+     const drift = videoElement.currentTime - audioElement.currentTime;
+ 
+-    if (audioElement.readyState < 2 || drift > 0.1) {
+-        freezePlayback = true;
+-        shouldResume = !videoElement.paused;
+-
+-        if (!videoElement.paused) videoElement.pause();
+-        if (!audioElement.paused) audioElement.pause();
+-
+-        const checkBuffer = () => {
+-            const audioEnd = audioElement.buffered.length
+-                ? audioElement.buffered.end(audioElement.buffered.length - 1)
+-                : 0;
+-
+-            if (audioElement.readyState >= 2 && audioEnd - videoElement.currentTime >= 0) {
+-                audioElement.currentTime = videoElement.currentTime;
+-
+-                if (shouldResume) {
+-                    audioElement.play().catch(() => {});
+-                    videoElement.play().catch(() => {});
+-                }
++    const audioEnd = audioElement.buffered.length
++        ? audioElement.buffered.end(audioElement.buffered.length - 1)
++        : 0;
+ 
+-                freezePlayback = false;
+-                shouldResume = false;
+-            } else {
+-                setTimeout(checkBuffer, throttleInterval);
+-            }
+-        };
+-        checkBuffer();
++    if (audioElement.readyState >= 3 &&
++        (audioEnd - videoElement.currentTime) >= minBufferLead &&
++        Math.abs(drift) > driftThreshold) {
++        audioElement.currentTime = videoElement.currentTime;
+     }
+-});
++}, 250);
++
++videoElement.addEventListener("timeupdate", checkDriftThrottled);
+ 
+ 
+ const videoObserver = new IntersectionObserver((entries) => {
+-- 
+2.53.0
+
