@@ -653,18 +653,19 @@ function resumeWhenBuffered() {
 
 document.addEventListener("visibilitychange", () => {
     if (!formatLoader.npa) return;
+    if (document.hidden) return;
+    if (videoElement.paused) return;
 
-    if (!document.hidden) {
-        if (!videoElement.paused) {
-            freezePlayback = true;
-            shouldResume = true;
+    const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
+    if (drift < 0.2) return;
 
-            videoElement.pause();
-            audioElement.pause();
+    freezePlayback = true;
+    shouldResume = true;
 
-            resumeWhenBuffered();
-        }
-    }
+    videoElement.pause();
+    audioElement.pause();
+
+    resumeWhenBuffered();
 });
 
 videoElement.addEventListener("seeking", () => {
