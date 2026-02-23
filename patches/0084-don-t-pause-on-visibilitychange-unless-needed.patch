@@ -1,0 +1,45 @@
+From 2a4718689f83e069508b35961301f208b04973ba Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 21 Feb 2026 20:27:40 +0300
+Subject: [PATCH] don't pause on visibilitychange unless needed
+
+---
+ html/static/js/player.js | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index a8c5bf5..dbf0fbf 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -653,18 +653,19 @@ function resumeWhenBuffered() {
+ 
+ document.addEventListener("visibilitychange", () => {
+     if (!formatLoader.npa) return;
++    if (document.hidden) return;
++    if (videoElement.paused) return;
+ 
+-    if (!document.hidden) {
+-        if (!videoElement.paused) {
+-            freezePlayback = true;
+-            shouldResume = true;
++    const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
++    if (drift < 0.2) return;
+ 
+-            videoElement.pause();
+-            audioElement.pause();
++    freezePlayback = true;
++    shouldResume = true;
+ 
+-            resumeWhenBuffered();
+-        }
+-    }
++    videoElement.pause();
++    audioElement.pause();
++
++    resumeWhenBuffered();
+ });
+ 
+ videoElement.addEventListener("seeking", () => {
+-- 
+2.53.0
+
