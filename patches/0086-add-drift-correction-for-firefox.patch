@@ -1,0 +1,109 @@
+From 44546ad86eebf99ec31790b43c19273853188177 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 26 Feb 2026 13:23:39 +0300
+Subject: [PATCH] add drift correction for firefox
+
+---
+ html/static/js/player.js | 77 ++++++++++++++++++++++++++++++++--------
+ 1 file changed, 62 insertions(+), 15 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index dbf0fbf..7a3f635 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -674,30 +674,77 @@ videoElement.addEventListener("seeking", () => {
+ 
+ // Drift detection and correction during playback
+ 
+-// Skip non-chrome
++// Detect browsers
+ const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
++const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
+ 
+-const driftThreshold = 0.15;
++const driftThreshold = 0.15;        // Chrome threshold
++const firefoxDriftThreshold = 0.3;  // Firefox threshold
+ const minBufferLead = 2.0;
++const firefoxMaxJump = 2.0;
+ 
+-const checkDriftThrottled = throttle(() => {
+-    if (!formatLoader.npa || !isChrome || freezePlayback) return;
++let lastFirefoxCorrection = 0;
++const firefoxCorrectionCooldown = 500; // ms
+ 
+-    const drift = videoElement.currentTime - audioElement.currentTime;
++if (isChrome) {
++    const checkDriftThrottled = throttle(() => {
++        if (!formatLoader.npa || freezePlayback) return;
+ 
+-    const audioEnd = audioElement.buffered.length
+-        ? audioElement.buffered.end(audioElement.buffered.length - 1)
+-        : 0;
++        const drift = videoElement.currentTime - audioElement.currentTime;
++        const audioEnd = audioElement.buffered.length
++            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            : 0;
+ 
+-    if (audioElement.readyState >= 3 &&
+-        (audioEnd - videoElement.currentTime) >= minBufferLead &&
+-        Math.abs(drift) > driftThreshold) {
+-        audioElement.currentTime = videoElement.currentTime;
+-    }
+-}, 250);
++        if (
++            audioElement.readyState >= 3 &&
++            (audioEnd - videoElement.currentTime) >= minBufferLead &&
++            Math.abs(drift) > driftThreshold
++        ) {
++            audioElement.currentTime = videoElement.currentTime;
++        }
++    }, 250);
+ 
+-videoElement.addEventListener("timeupdate", checkDriftThrottled);
++    videoElement.addEventListener("timeupdate", checkDriftThrottled);
++}
+ 
++// Firefox logic: setInterval loop
++if (isFirefox) {
++    const firefoxDriftInterval = setInterval(() => {
++        // Skip if not ready or playback is frozen/paused
++        if (
++            !formatLoader.npa ||
++            freezePlayback ||
++            videoElement.paused ||
++            audioElement.paused ||
++            videoElement.readyState < 3 ||               // wait until video can play
++            (formatLoader.npa && audioElement.readyState < 3) // wait until audio can play
++        ) return;
++
++        const now = performance.now();
++        if (now - lastFirefoxCorrection < firefoxCorrectionCooldown) return;
++
++        const drift = videoElement.currentTime - audioElement.currentTime;
++        const audioEnd = audioElement.buffered.length
++            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            : 0;
++
++        if (
++            audioElement.readyState >= 3 &&
++            (audioEnd - videoElement.currentTime) >= minBufferLead &&
++            Math.abs(drift) > firefoxDriftThreshold
++        ) {
++            if (Math.abs(drift) > firefoxMaxJump) {
++                // large drift: jump immediately
++                videoElement.currentTime = audioElement.currentTime;
++            } else {
++                // small drift: adjust gradually
++                videoElement.currentTime += drift * 0.5;
++            }
++
++            lastFirefoxCorrection = now;
++        }
++    }, 250); // check every 250ms
++}
+ 
+ const videoObserver = new IntersectionObserver((entries) => {
+     entries.forEach(entry => {
+-- 
+2.53.0
+
