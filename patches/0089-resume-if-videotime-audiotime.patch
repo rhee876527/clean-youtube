@@ -1,0 +1,50 @@
+From a8f1e7aa226215eb4cb506cb3d7ef1f981ec715e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 2 Mar 2026 18:26:22 +0300
+Subject: [PATCH] resume if videotime === audiotime
+
+---
+ html/static/js/player.js | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 06a762d..5f09f5d 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -559,8 +559,21 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+         return;
+     }
+ 
+-    // Wait until audio has sufficient buffer ahead of video
+     const requiredBuffer = 6;
++    const audioEnd = audioEl.buffered.length
++        ? audioEl.buffered.end(audioEl.buffered.length - 1)
++        : 0;
++
++    // Fast-path: already buffered enough, play immediately
++    if (audioEnd - videoEl.currentTime >= requiredBuffer) {
++        audioEl.currentTime = videoEl.currentTime;
++        try { await audioEl.play(); } catch {}
++        try { await videoEl.play(); } catch {}
++        startSyncCheck();
++        return;
++    }
++
++    // Not enough buffer: wait for it
+     await new Promise((resolve, reject) => {
+         const check = () => {
+             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+@@ -576,10 +589,8 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+     });
+ 
+     audioEl.currentTime = videoEl.currentTime;
+-
+     try { await audioEl.play(); } catch {}
+     try { await videoEl.play(); } catch {}
+-
+     startSyncCheck();
+ }
+ 
+-- 
+2.53.0
+
