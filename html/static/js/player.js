@@ -559,8 +559,21 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
         return;
     }
 
-    // Wait until audio has sufficient buffer ahead of video
     const requiredBuffer = 6;
+    const audioEnd = audioEl.buffered.length
+        ? audioEl.buffered.end(audioEl.buffered.length - 1)
+        : 0;
+
+    // Fast-path: already buffered enough, play immediately
+    if (audioEnd - videoEl.currentTime >= requiredBuffer) {
+        audioEl.currentTime = videoEl.currentTime;
+        try { await audioEl.play(); } catch {}
+        try { await videoEl.play(); } catch {}
+        startSyncCheck();
+        return;
+    }
+
+    // Not enough buffer: wait for it
     await new Promise((resolve, reject) => {
         const check = () => {
             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
@@ -576,10 +589,8 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
     });
 
     audioEl.currentTime = videoEl.currentTime;
-
     try { await audioEl.play(); } catch {}
     try { await videoEl.play(); } catch {}
-
     startSyncCheck();
 }
 
