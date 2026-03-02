@@ -21,6 +21,7 @@ let userInteracted = false;
 document.addEventListener("click", () => { userInteracted = true; alignStreams(); }, { once: true });
 
 let syncCheckInterval = null;
+let playAbortController = null;
 const videoFormats = new Map();
 const audioFormats = [];
 
@@ -447,11 +448,18 @@ function throttle(func, delay) {
     };
 }
 
+let syncCheckFn = null;
+
 function startSyncCheck() {
     if (!formatLoader.npa || audioElement.readyState < 3) return;
 
     const driftThreshold = 0.3;
     const syncInterval = 300;
+
+    // Cancel any existing sync listener
+    if (syncCheckFn) {
+        videoElement.removeEventListener('timeupdate', syncCheckFn);
+    }
 
     const sync = throttle(() => {
         if (videoElement.paused || audioElement.paused) return;
@@ -475,14 +483,20 @@ function startSyncCheck() {
         }
     }, syncInterval);
 
-    videoElement.removeEventListener('timeupdate', sync);
+    syncCheckFn = sync;
     videoElement.addEventListener('timeupdate', sync);
 }
 
 
 function stopSyncCheck() {
-    if (syncCheckInterval) clearInterval(syncCheckInterval);
-    syncCheckInterval = null;
+    if (syncCheckFn) {
+        videoElement.removeEventListener('timeupdate', syncCheckFn);
+        syncCheckFn = null;
+    }
+    if (syncCheckInterval) {
+        clearInterval(syncCheckInterval);
+        syncCheckInterval = null;
+    }
 }
 
 function cleanupSync() {
@@ -505,6 +519,11 @@ function playbackIntervention(event) {
             audioElement.currentTime = videoElement.currentTime;
             audioElement.play().catch(() => {});
         } else if (event.type === "pause" && formatLoader.npa && !audioElement.paused) {
+            // Cancel any pending play operations
+            if (playAbortController) {
+                playAbortController.abort();
+                playAbortController = null;
+            }
             audioElement.pause();
         }
     }
@@ -533,7 +552,7 @@ function playbackIntervention(event) {
     }
 }
 
-async function waitForAudioThenPlay(videoEl, audioEl) {
+async function waitForAudioThenPlay(videoEl, audioEl, signal) {
     if (videoEl.paused === false) return;
     if (!formatLoader.npa) {
         await videoEl.play();
@@ -542,8 +561,10 @@ async function waitForAudioThenPlay(videoEl, audioEl) {
 
     // Wait until audio has sufficient buffer ahead of video
     const requiredBuffer = 6;
-    await new Promise(resolve => {
+    await new Promise((resolve, reject) => {
         const check = () => {
+            if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+            
             const audioEnd = audioEl.buffered.length
                 ? audioEl.buffered.end(audioEl.buffered.length - 1)
                 : 0;
@@ -619,6 +640,12 @@ let shouldResume = false
 videoElement.addEventListener("seeking", async () => {
     if (!formatLoader.npa) return;
 
+    // Cancel any pending play operations
+    if (playAbortController) {
+        playAbortController.abort();
+        playAbortController = null;
+    }
+
     freezePlayback = true;
     shouldResume = !videoElement.paused;
 
@@ -646,7 +673,8 @@ function resumeWhenBuffered() {
         audioElement.currentTime = videoElement.currentTime;
         videoElement.play().catch(() => {});
         audioElement.play().catch(() => {});
-    } else {
+    } else if (freezePlayback && shouldResume) {
+        // Only continue if state is still valid
         requestAnimationFrame(resumeWhenBuffered);
     }
 }
@@ -658,6 +686,12 @@ document.addEventListener("visibilitychange", () => {
 
     const drift = Math.abs(videoElement.currentTime - audioElement.currentTime);
     if (drift < 0.2) return;
+
+    // Cancel any pending play operations
+    if (playAbortController) {
+        playAbortController.abort();
+        playAbortController = null;
+    }
 
     freezePlayback = true;
     shouldResume = true;
@@ -771,17 +805,23 @@ const debouncedPlayVideo = debounce(async () => {
     if (!userInteracted) return;
     if (!videoElement.paused) return;
 
+    // Abort any pending play operation
+    if (playAbortController) {
+        playAbortController.abort();
+    }
+    playAbortController = new AbortController();
+
     try {
         if (audioContext.state === 'suspended') await audioContext.resume();
 
         if (formatLoader.npa) {
-            await waitForAudioThenPlay(videoElement, audioElement);
+            await waitForAudioThenPlay(videoElement, audioElement, playAbortController.signal);
         } else {
             await videoElement.play();
         }
     } catch (err) {
-        if (err.name === 'AbortError') {
-            return; // Expected during rapid seeks — silent ignore
+        if (err.name === 'AbortError' || playAbortController?.signal.aborted) {
+            return; // Expected during rapid seeks or pause — silent ignore
         }
         console.error("Playback failed:", err);
     }
@@ -796,6 +836,11 @@ function togglePlaying() {
         if (!userInteracted) return;
         playVideo();
     } else {
+        // Cancel any pending play operations
+        if (playAbortController) {
+            playAbortController.abort();
+            playAbortController = null;
+        }
         videoElement.pause();
         if (formatLoader.npa) audioElement.pause(); // also pause separate audio
     }
@@ -822,6 +867,12 @@ videoElement.addEventListener("click", (event) => {
 });
 
 videoElement.addEventListener("seeking", () => {
+    // Cancel any pending play operations
+    if (playAbortController) {
+        playAbortController.abort();
+        playAbortController = null;
+    }
+
     freezePlayback = true;
     if (formatLoader.npa && !videoElement.paused) {
         shouldResume = true;
@@ -890,6 +941,11 @@ document.addEventListener("keydown", async (event) => {
                     }
                 }
             } else {
+                // Cancel any pending play operations
+                if (playAbortController) {
+                    playAbortController.abort();
+                    playAbortController = null;
+                }
                 videoElement.pause();
                 audioElement.pause();
             }
@@ -950,6 +1006,12 @@ new SubscribeButton(q("#subscribe"));
 // Helper function to seek to timestamp
 async function seekToTimestamp(time, href = null) {
     if (isNaN(time)) return;
+
+    // Cancel any pending play operations
+    if (playAbortController) {
+        playAbortController.abort();
+        playAbortController = null;
+    }
 
     // Set times
     videoElement.currentTime = time;
