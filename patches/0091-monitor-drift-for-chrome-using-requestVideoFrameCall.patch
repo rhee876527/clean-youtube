@@ -1,0 +1,119 @@
+From c36da8d52a9d7717925c1b73a1186020cec37813 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 7 Mar 2026 15:22:18 +0300
+Subject: [PATCH] monitor drift for chrome using requestVideoFrameCallback
+
+---
+ html/static/js/player.js | 74 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 61 insertions(+), 13 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 5f09f5d..3bd8146 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -577,7 +577,7 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+     await new Promise((resolve, reject) => {
+         const check = () => {
+             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+-            
++
+             const audioEnd = audioEl.buffered.length
+                 ? audioEl.buffered.end(audioEl.buffered.length - 1)
+                 : 0;
+@@ -723,7 +723,7 @@ videoElement.addEventListener("seeking", () => {
+ const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
+ const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
+ 
+-const driftThreshold = 0.15;        // Chrome threshold
++const chromedriftThreshold = 0.25;        // Chrome threshold
+ const firefoxDriftThreshold = 0.3;  // Firefox threshold
+ const minBufferLead = 2.0;
+ const firefoxMaxJump = 2.0;
+@@ -731,25 +731,73 @@ const firefoxMaxJump = 2.0;
+ let lastFirefoxCorrection = 0;
+ const firefoxCorrectionCooldown = 500; // ms
+ 
++// Chrome: frame-accurate drift monitoring
+ if (isChrome) {
+-    const checkDriftThrottled = throttle(() => {
+-        if (!formatLoader.npa || freezePlayback) return;
++    let driftLocked = false;
++    let resumeCheckRunning = false;
++
++    function monitorDrift(now, metadata) {
++        if (!formatLoader.npa || freezePlayback) {
++            videoElement.requestVideoFrameCallback(monitorDrift);
++            return;
++        }
++
++        const videoTime = metadata.mediaTime;
++        const audioTime = audioElement.currentTime;
++        const drift = videoTime - audioTime;
+ 
+-        const drift = videoElement.currentTime - audioElement.currentTime;
+         const audioEnd = audioElement.buffered.length
+             ? audioElement.buffered.end(audioElement.buffered.length - 1)
+             : 0;
+ 
+-        if (
+-            audioElement.readyState >= 3 &&
+-            (audioEnd - videoElement.currentTime) >= minBufferLead &&
+-            Math.abs(drift) > driftThreshold
+-        ) {
+-            audioElement.currentTime = videoElement.currentTime;
++        const bufferLead = audioEnd - videoTime;
++
++        if (!driftLocked && Math.abs(drift) > chromedriftThreshold) {
++            if (bufferLead >= minBufferLead) {
++                audioElement.currentTime = videoTime;
++            } else {
++                driftLocked = true;
++                videoElement.pause();
++                startResumeMonitor();
++            }
+         }
+-    }, 250);
+ 
+-    videoElement.addEventListener("timeupdate", checkDriftThrottled);
++        videoElement.requestVideoFrameCallback(monitorDrift);
++    }
++
++    function startResumeMonitor() {
++        if (resumeCheckRunning) return;
++        resumeCheckRunning = true;
++
++        const check = () => {
++            const audioEnd = audioElement.buffered.length
++                ? audioElement.buffered.end(audioElement.buffered.length - 1)
++                : 0;
++            const bufferLead = audioEnd - videoElement.currentTime;
++
++            if (bufferLead >= minBufferLead + 1.0) {
++                audioElement.currentTime = videoElement.currentTime;
++
++                videoElement.play().catch(() => {});
++                audioElement.play().catch(() => {});
++
++                driftLocked = false;
++                resumeCheckRunning = false;
++                return;
++            }
++
++            // If bufferLead is very low, wait a bit longer before checking again
++            if (bufferLead < 1.0) {
++                setTimeout(check, 500); // slower check during long stall
++            } else {
++                requestAnimationFrame(check); // faster check when nearly ready
++            }
++        };
++
++        check();
++    }
++
++    videoElement.requestVideoFrameCallback(monitorDrift);
+ }
+ 
+ // Firefox logic: setInterval loop
+-- 
+2.53.0
+
