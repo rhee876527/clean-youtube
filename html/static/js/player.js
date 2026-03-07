@@ -577,7 +577,7 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
     await new Promise((resolve, reject) => {
         const check = () => {
             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
-            
+
             const audioEnd = audioEl.buffered.length
                 ? audioEl.buffered.end(audioEl.buffered.length - 1)
                 : 0;
@@ -723,7 +723,7 @@ videoElement.addEventListener("seeking", () => {
 const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
 const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
 
-const driftThreshold = 0.15;        // Chrome threshold
+const chromedriftThreshold = 0.25;        // Chrome threshold
 const firefoxDriftThreshold = 0.3;  // Firefox threshold
 const minBufferLead = 2.0;
 const firefoxMaxJump = 2.0;
@@ -731,25 +731,73 @@ const firefoxMaxJump = 2.0;
 let lastFirefoxCorrection = 0;
 const firefoxCorrectionCooldown = 500; // ms
 
+// Chrome: frame-accurate drift monitoring
 if (isChrome) {
-    const checkDriftThrottled = throttle(() => {
-        if (!formatLoader.npa || freezePlayback) return;
+    let driftLocked = false;
+    let resumeCheckRunning = false;
 
-        const drift = videoElement.currentTime - audioElement.currentTime;
+    function monitorDrift(now, metadata) {
+        if (!formatLoader.npa || freezePlayback) {
+            videoElement.requestVideoFrameCallback(monitorDrift);
+            return;
+        }
+
+        const videoTime = metadata.mediaTime;
+        const audioTime = audioElement.currentTime;
+        const drift = videoTime - audioTime;
+
         const audioEnd = audioElement.buffered.length
             ? audioElement.buffered.end(audioElement.buffered.length - 1)
             : 0;
 
-        if (
-            audioElement.readyState >= 3 &&
-            (audioEnd - videoElement.currentTime) >= minBufferLead &&
-            Math.abs(drift) > driftThreshold
-        ) {
-            audioElement.currentTime = videoElement.currentTime;
-        }
-    }, 250);
+        const bufferLead = audioEnd - videoTime;
 
-    videoElement.addEventListener("timeupdate", checkDriftThrottled);
+        if (!driftLocked && Math.abs(drift) > chromedriftThreshold) {
+            if (bufferLead >= minBufferLead) {
+                audioElement.currentTime = videoTime;
+            } else {
+                driftLocked = true;
+                videoElement.pause();
+                startResumeMonitor();
+            }
+        }
+
+        videoElement.requestVideoFrameCallback(monitorDrift);
+    }
+
+    function startResumeMonitor() {
+        if (resumeCheckRunning) return;
+        resumeCheckRunning = true;
+
+        const check = () => {
+            const audioEnd = audioElement.buffered.length
+                ? audioElement.buffered.end(audioElement.buffered.length - 1)
+                : 0;
+            const bufferLead = audioEnd - videoElement.currentTime;
+
+            if (bufferLead >= minBufferLead + 1.0) {
+                audioElement.currentTime = videoElement.currentTime;
+
+                videoElement.play().catch(() => {});
+                audioElement.play().catch(() => {});
+
+                driftLocked = false;
+                resumeCheckRunning = false;
+                return;
+            }
+
+            // If bufferLead is very low, wait a bit longer before checking again
+            if (bufferLead < 1.0) {
+                setTimeout(check, 500); // slower check during long stall
+            } else {
+                requestAnimationFrame(check); // faster check when nearly ready
+            }
+        };
+
+        check();
+    }
+
+    videoElement.requestVideoFrameCallback(monitorDrift);
 }
 
 // Firefox logic: setInterval loop
