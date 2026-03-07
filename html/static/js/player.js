@@ -723,7 +723,7 @@ videoElement.addEventListener("seeking", () => {
 const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
 const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
 
-const chromedriftThreshold = 0.25;        // Chrome threshold
+const chromedriftThreshold = 0.15;        // Chrome threshold
 const firefoxDriftThreshold = 0.3;  // Firefox threshold
 const minBufferLead = 2.0;
 const firefoxMaxJump = 2.0;
@@ -769,6 +769,8 @@ if (isChrome) {
         if (resumeCheckRunning) return;
         resumeCheckRunning = true;
 
+        const checkInterval = 250;
+
         const check = () => {
             const audioEnd = audioElement.buffered.length
                 ? audioElement.buffered.end(audioElement.buffered.length - 1)
@@ -786,12 +788,7 @@ if (isChrome) {
                 return;
             }
 
-            // If bufferLead is very low, wait a bit longer before checking again
-            if (bufferLead < 1.0) {
-                setTimeout(check, 500); // slower check during long stall
-            } else {
-                requestAnimationFrame(check); // faster check when nearly ready
-            }
+            setTimeout(check, bufferLead < 1.0 ? 500 : checkInterval);
         };
 
         check();
