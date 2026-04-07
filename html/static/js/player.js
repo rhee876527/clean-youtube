@@ -553,19 +553,28 @@ function playbackIntervention(event) {
 }
 
 async function waitForAudioThenPlay(videoEl, audioEl, signal) {
-    if (videoEl.paused === false) return;
+    const wasPaused = videoEl.paused;
+
+    if (!wasPaused && videoEl.readyState >= 3 && (!formatLoader.npa || (audioEl.readyState >= 3 && audioEl.src))) return;
     if (!formatLoader.npa) {
         await videoEl.play();
         return;
     }
 
-    const requiredBuffer = 6;
-    const audioEnd = audioEl.buffered.length
-        ? audioEl.buffered.end(audioEl.buffered.length - 1)
-        : 0;
+    const requiredBuffer = 3;
+    const resumeTimeout = 2000; // 2s max if resuming from pause
 
-    // Fast-path: already buffered enough, play immediately
-    if (audioEnd - videoEl.currentTime >= requiredBuffer) {
+    const getBufferedAhead = (media, time) => {
+        const ranges = media.buffered;
+        for (let i = 0; i < ranges.length; i++) {
+            const start = ranges.start(i);
+            const end = ranges.end(i);
+            if (time >= start - 0.05 && time <= end) return end - time;
+        }
+        return 0;
+    };
+
+    if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) {
         audioEl.currentTime = videoEl.currentTime;
         try { await audioEl.play(); } catch {}
         try { await videoEl.play(); } catch {}
@@ -573,18 +582,19 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
         return;
     }
 
-    // Not enough buffer: wait for it
     await new Promise((resolve, reject) => {
+        const startTime = performance.now();
+
         const check = () => {
             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
 
-            const audioEnd = audioEl.buffered.length
-                ? audioEl.buffered.end(audioEl.buffered.length - 1)
-                : 0;
+            if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) return resolve();
 
-            if (audioEnd - videoEl.currentTime >= requiredBuffer) return resolve();
+            if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve(); // 2s cap only for resume
+
             requestAnimationFrame(check);
         };
+
         check();
     });
 
