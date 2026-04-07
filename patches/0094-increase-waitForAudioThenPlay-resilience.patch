@@ -1,0 +1,78 @@
+From 21ca788677b51ff238ee8195ae20d54be0c5ba96 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 7 Apr 2026 21:15:59 +0300
+Subject: [PATCH] increase waitForAudioThenPlay resilience
+
+buffer detection can be broken on some media, we need timeout fallback
+---
+ html/static/js/player.js | 34 ++++++++++++++++++++++------------
+ 1 file changed, 22 insertions(+), 12 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index fe86d88..e2353ab 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -553,19 +553,28 @@ function playbackIntervention(event) {
+ }
+ 
+ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+-    if (videoEl.paused === false) return;
++    const wasPaused = videoEl.paused;
++
++    if (!wasPaused && videoEl.readyState >= 3 && (!formatLoader.npa || (audioEl.readyState >= 3 && audioEl.src))) return;
+     if (!formatLoader.npa) {
+         await videoEl.play();
+         return;
+     }
+ 
+-    const requiredBuffer = 6;
+-    const audioEnd = audioEl.buffered.length
+-        ? audioEl.buffered.end(audioEl.buffered.length - 1)
+-        : 0;
++    const requiredBuffer = 3;
++    const resumeTimeout = 2000; // 2s max if resuming from pause
++
++    const getBufferedAhead = (media, time) => {
++        const ranges = media.buffered;
++        for (let i = 0; i < ranges.length; i++) {
++            const start = ranges.start(i);
++            const end = ranges.end(i);
++            if (time >= start - 0.05 && time <= end) return end - time;
++        }
++        return 0;
++    };
+ 
+-    // Fast-path: already buffered enough, play immediately
+-    if (audioEnd - videoEl.currentTime >= requiredBuffer) {
++    if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) {
+         audioEl.currentTime = videoEl.currentTime;
+         try { await audioEl.play(); } catch {}
+         try { await videoEl.play(); } catch {}
+@@ -573,18 +582,19 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+         return;
+     }
+ 
+-    // Not enough buffer: wait for it
+     await new Promise((resolve, reject) => {
++        const startTime = performance.now();
++
+         const check = () => {
+             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+ 
+-            const audioEnd = audioEl.buffered.length
+-                ? audioEl.buffered.end(audioEl.buffered.length - 1)
+-                : 0;
++            if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) return resolve();
++
++            if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve(); // 2s cap only for resume
+ 
+-            if (audioEnd - videoEl.currentTime >= requiredBuffer) return resolve();
+             requestAnimationFrame(check);
+         };
++
+         check();
+     });
+ 
+-- 
+2.53.0
+

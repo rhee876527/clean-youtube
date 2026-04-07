@@ -1,0 +1,49 @@
+From 56dd6b1701b5ab98002356ce6c55a4e0a80f935c Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 7 Mar 2026 20:30:52 +0300
+Subject: [PATCH] fix perf issues with c36da8d52a9d7717925c1b73a1186020cec37813
+
+managing context for LLMs is not a suggestion
+---
+ html/static/js/player.js | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 3bd8146..fe86d88 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -723,7 +723,7 @@ videoElement.addEventListener("seeking", () => {
+ const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
+ const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
+ 
+-const chromedriftThreshold = 0.25;        // Chrome threshold
++const chromedriftThreshold = 0.15;        // Chrome threshold
+ const firefoxDriftThreshold = 0.3;  // Firefox threshold
+ const minBufferLead = 2.0;
+ const firefoxMaxJump = 2.0;
+@@ -769,6 +769,8 @@ if (isChrome) {
+         if (resumeCheckRunning) return;
+         resumeCheckRunning = true;
+ 
++        const checkInterval = 250;
++
+         const check = () => {
+             const audioEnd = audioElement.buffered.length
+                 ? audioElement.buffered.end(audioElement.buffered.length - 1)
+@@ -786,12 +788,7 @@ if (isChrome) {
+                 return;
+             }
+ 
+-            // If bufferLead is very low, wait a bit longer before checking again
+-            if (bufferLead < 1.0) {
+-                setTimeout(check, 500); // slower check during long stall
+-            } else {
+-                requestAnimationFrame(check); // faster check when nearly ready
+-            }
++            setTimeout(check, bufferLead < 1.0 ? 500 : checkInterval);
+         };
+ 
+         check();
+-- 
+2.53.0
+
