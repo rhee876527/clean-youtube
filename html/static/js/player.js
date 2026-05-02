@@ -574,6 +574,7 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
         return 0;
     };
 
+    // Early check: if buffer is already sufficient, proceed immediately
     if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) {
         audioEl.currentTime = videoEl.currentTime;
         try { await audioEl.play(); } catch {}
@@ -588,9 +589,16 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
         const check = () => {
             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
 
+            // Primary checks: multiple detection strategies to catch ready state early
+            
+            // 1. Buffer ahead check - most reliable
             if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) return resolve();
-
-            if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve(); // 2s cap only for resume
+            
+            // 2. ReadyState check - if both are HAVE_FUTURE_DATA or better, media is ready
+            if (videoEl.readyState >= 3 && audioEl.readyState >= 3) return resolve();
+            
+            // 3. Fallback timeout - if resuming from pause and timeout exceeded, proceed anyway
+            if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve();
 
             requestAnimationFrame(check);
         };
@@ -616,7 +624,14 @@ const debouncedPlaybackIntervention = debounce(playbackIntervention, 100);
 ["pause", "play", "seeked"].forEach(eventName =>
     videoElement.addEventListener(eventName, debouncedPlaybackIntervention)
 );
-["canplaythrough", "waiting", "stalled", "ratechange"].forEach(eventName => {
+// Debounce waiting/stalled to prevent buffering loop: these events fire frequently during buffering
+// and can cause cascading state changes without throttling
+const debouncedPlaybackInterventionWaiting = debounce(playbackIntervention, 500);
+["waiting", "stalled"].forEach(eventName => {
+    videoElement.addEventListener(eventName, debouncedPlaybackInterventionWaiting);
+    audioElement.addEventListener(eventName, debouncedPlaybackInterventionWaiting);
+});
+["canplaythrough", "ratechange"].forEach(eventName => {
     videoElement.addEventListener(eventName, playbackIntervention);
     audioElement.addEventListener(eventName, playbackIntervention);
 });
