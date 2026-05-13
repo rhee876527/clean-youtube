@@ -17,7 +17,7 @@ module.exports = [
 			if (!fetchURL.toString().startsWith(instanceOrigin) || !authorizedPaths.some(element => fetchURL.pathname.match(new RegExp(`^${element}$`)))) {
 				return {
 					statusCode: 401,
-					content: "CloudTube: Unauthorized",
+					content: "CloudTube-NG: Unauthorized",
 					contentType: "text/plain"
 				}
 			}

@@ -29,7 +29,7 @@ mixin select({id, label, description, disabled, options})
       .field-row__description!= description
 
 block head
-  title Settings - CloudTube
+  title Settings - CloudTube-NG
 
 block content
   main.settings-page
@@ -49,7 +49,7 @@ block content
         +input({
           id: "instance",
           label: "Instance",
-          description: 'CloudTube will fetch information from this <a href="https://invidious.io/">Invidious</a> or <a href="https://git.sr.ht/~cadence/NewLeaf">NewLeaf</a> instance.',
+          description: 'CloudTube-NG will fetch information from this <a href="https://invidious.io/">Invidious</a> or <a href="https://git.sr.ht/~cadence/NewLeaf">NewLeaf</a> instance.',
           type: "url",
           placeholder: constants.user_settings.instance.default,
           list: instances
@@ -58,9 +58,9 @@ block content
         +select({
           id: "local",
           label: "Play videos on",
-          description: 'If CloudTube, the instance above will be used.\nIf YouTube, you will be redirected there.\nIf local, CloudTube will try to connect to a NewLeaf/Invidious instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
+          description: 'If CloudTube-NG, the instance above will be used.\nIf YouTube, you will be redirected there.\nIf local, CloudTube-NG will try to connect to a NewLeaf/Invidious instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
           options: [
-            {value: "0", text: "CloudTube"},
+            {value: "0", text: "CloudTube-NG"},
             {value: "2", text: "YouTube"},
             {value: "1", text: "Local"},
           ]
@@ -112,7 +112,7 @@ block content
     if user.token
       details.data-management
         summary Sync data
-        p Open this link elsewhere to import your current CloudTube session there.
+        p Open this link elsewhere to import your current CloudTube-NG session there.
         p.
           If you clear your cookies often, you can bookmark this link and open it
           to restore your data, or if you have multiple devices, you can send this
@@ -123,7 +123,7 @@ block content
 
       details.data-management.delete-details
         summary Delete data
-        p Press this button to erase all your data from CloudTube.
+        p Press this button to erase all your data from CloudTube-NG.
         p.
           Just the current session will be removed. If you lost access to a
           previous session, you cannot touch it.

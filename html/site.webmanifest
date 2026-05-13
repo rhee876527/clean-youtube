@@ -1,6 +1,6 @@
 {
-    "name": "CloudTube",
-    "short_name": "CloudTube",
+    "name": "CloudTube-NG",
+    "short_name": "CloudTube-NG",
     "icons": [
         {
             "src": "/static/images/android-chrome-192x192.png",

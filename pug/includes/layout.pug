@@ -12,8 +12,8 @@ html
     link(rel="manifest" href="/site.webmanifest")
     link(rel="mask-icon" href="/static/images/safari-pinned-tab.svg" color="#5bbad5")
     link(rel="shortcut icon" href="/static/images/favicon.ico")
-    meta(name="apple-mobile-web-app-title" content="CloudTube")
-    meta(name="application-name" content="CloudTube")
+    meta(name="apple-mobile-web-app-title" content="Cloudtube-NG")
+    meta(name="application-name" content="Cloudtube-NG")
     meta(name="msapplication-TileColor" content="#2b5797")
     meta(name="msapplication-config" content="/browserconfig.xml")
     meta(name="theme-color" content="#36393f")
@@ -27,9 +27,9 @@ html
       nav.main-nav
         .links
           if req && req.headers && "x-insecure" in req.headers
-            a(href="/").link.home CloudTube - Insecure
+            a(href="/").link.home Cloudtube-NG - Insecure
           else
-            a(href="/").link.home CloudTube
+            a(href="/").link.home Cloudtube-NG
           a(href="/subscriptions" title="Subscriptions").link.icon-link
             != icons.get("subscriptions")
           a(href="/settings" title="Settings").link.icon-link

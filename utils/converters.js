@@ -65,7 +65,7 @@ function rewriteVideoDescription(descriptionHtml, id) {
 	// https://www.youtube.com/watch?v=VdPsJW6AHqc 00:00 timestamps, youtu.be/<videoid>
 	// https://www.youtube.com/watch?v=FDMq9ie0ih0 00:00 & 00:00:00 timestamps
 	// https://www.youtube.com/watch?v=fhum63fAwrI www.youtube.com/watch?v=<videoid>
-	// https://www.youtube.com/watch?v=i-szWOrc3Mo www.youtube.com/<channelname> (unsupported by cloudtube currently)
+	// https://www.youtube.com/watch?v=i-szWOrc3Mo www.youtube.com/<channelname> (unsupported by Cloudtube-NG currently)
 	// https://www.youtube.com/watch?v=LSG71wbKpbQ www.youtube.com/channel/<id>
 	// https://www.youtube.com/watch?v=RiEkOKFOG3s youtu.be/<videoid> with params
 

@@ -7,7 +7,7 @@ jobs:
   login:
     runs-on: ubuntu-latest
     env:
-      PACKAGE_NAME: cloudtube
+      PACKAGE_NAME: cloudtube-ng
 
     steps:
       - name: Checkout

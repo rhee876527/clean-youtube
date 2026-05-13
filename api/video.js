@@ -102,7 +102,7 @@ module.exports = [
 			const id = url.searchParams.get("v");
 
 			if (settings.local === 2) {
-				const dest = `https://www.youtube.com${url.pathname}${url.search}#cloudtube`;
+				const dest = `https://www.youtube.com${url.pathname}${url.search}#cloudtube-ng`;
 				user.addWatchedVideoMaybe(id);
 				return {
 					statusCode: 302,
