@@ -40,6 +40,9 @@ function lengthSecondsToLengthText(seconds) {
  * - second__viewCountText is added
  */
 function normaliseVideoInfo(video) {
+	if (!video.videoId && video.playlistId) {
+		video.videoId = video.playlistId
+	}
 	if (!video.second__lengthText && video.lengthSeconds > 0) {
 		video.second__lengthText = lengthSecondsToLengthText(video.lengthSeconds)
 	}
