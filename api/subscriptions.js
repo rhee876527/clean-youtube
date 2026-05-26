@@ -30,7 +30,7 @@ module.exports = [
 						.map(video => {
 							video.publishedText = timeToPastText(video.published * 1000)
 							video.watched = watchedVideos.includes(video.videoId)
-							video.descriptionHtml = rewriteVideoDescription(video.descriptionHtml, video.videoId)
+							video.descriptionHtml = video.descriptionHtml ? rewriteVideoDescription(video.descriptionHtml, video.videoId) : ''
 							return video
 						})
 				}

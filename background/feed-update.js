@@ -82,11 +82,18 @@ class Refresher {
 			const videos = Array.isArray(root) ? root : (root.videos || [])
 			if (videos.length > 0) {
 				videos.forEach(video => {
-					// organise
-					video.descriptionHtml = video.descriptionHtml.replace(/<a /g, '<a tabindex="-1" ') // should be safe
-					video.viewCountText = null //TODO?
+					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
+					const row = {
+						videoId: video.videoId ?? video.playlistId,
+						title: video.title,
+						author: video.author,
+						authorId: video.authorId,
+						published: video.published ?? null,
+						viewCountText: video.viewCountText ?? null,
+						descriptionHtml: video.descriptionHtml?.replace(/<a /g, '<a tabindex="-1" ') ?? ''
+					}
 					// store
-					prepared.video_insert.run(video)
+					prepared.video_insert.run(row)
 				})
 				// update channel refreshed
 				prepared.channel_refreshed_update.run(Date.now(), ucid)
