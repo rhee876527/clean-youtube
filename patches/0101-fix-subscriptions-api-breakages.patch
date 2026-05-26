@@ -1,0 +1,53 @@
+From aa8a33fd9265f3199503f03c7d2816c1fb1a53e0 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 26 May 2026 18:05:41 +0300
+Subject: [PATCH] fix subscriptions api breakages
+
+---
+ api/subscriptions.js      |  2 +-
+ background/feed-update.js | 15 +++++++++++----
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/api/subscriptions.js b/api/subscriptions.js
+index b92887c..1ed803d 100644
+--- a/api/subscriptions.js
++++ b/api/subscriptions.js
+@@ -30,7 +30,7 @@ module.exports = [
+ 						.map(video => {
+ 							video.publishedText = timeToPastText(video.published * 1000)
+ 							video.watched = watchedVideos.includes(video.videoId)
+-							video.descriptionHtml = rewriteVideoDescription(video.descriptionHtml, video.videoId)
++							video.descriptionHtml = video.descriptionHtml ? rewriteVideoDescription(video.descriptionHtml, video.videoId) : ''
+ 							return video
+ 						})
+ 				}
+diff --git a/background/feed-update.js b/background/feed-update.js
+index 7753c90..5012927 100644
+--- a/background/feed-update.js
++++ b/background/feed-update.js
+@@ -82,11 +82,18 @@ class Refresher {
+ 			const videos = Array.isArray(root) ? root : (root.videos || [])
+ 			if (videos.length > 0) {
+ 				videos.forEach(video => {
+-					// organise
+-					video.descriptionHtml = video.descriptionHtml.replace(/<a /g, '<a tabindex="-1" ') // should be safe
+-					video.viewCountText = null //TODO?
++					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
++					const row = {
++						videoId: video.videoId ?? video.playlistId,
++						title: video.title,
++						author: video.author,
++						authorId: video.authorId,
++						published: video.published ?? null,
++						viewCountText: video.viewCountText ?? null,
++						descriptionHtml: video.descriptionHtml?.replace(/<a /g, '<a tabindex="-1" ') ?? ''
++					}
+ 					// store
+-					prepared.video_insert.run(video)
++					prepared.video_insert.run(row)
+ 				})
+ 				// update channel refreshed
+ 				prepared.channel_refreshed_update.run(Date.now(), ucid)
+-- 
+2.54.0
+

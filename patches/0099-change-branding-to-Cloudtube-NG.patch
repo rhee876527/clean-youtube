@@ -1,0 +1,439 @@
+From 94a041d2f0d28736f889ddec5a7375ab311165f0 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 13 May 2026 12:14:09 +0300
+Subject: [PATCH] change branding to Cloudtube-NG
+
+---
+ .github/workflows/docker-build.yml |  2 +-
+ api/proxy.js                       |  2 +-
+ api/video.js                       |  2 +-
+ html/site.webmanifest              |  4 ++--
+ pug/channel-error.pug              |  2 +-
+ pug/channel.pug                    |  2 +-
+ pug/errors/fetch-error.pug         |  4 ++--
+ pug/errors/rate-limited.pug        |  4 ++--
+ pug/filters.pug                    |  2 +-
+ pug/home.pug                       |  4 ++--
+ pug/includes/layout.pug            |  8 ++++----
+ pug/local-video.pug                |  4 ++--
+ pug/privacy.pug                    | 12 ++++++------
+ pug/search.pug                     |  2 +-
+ pug/settings.pug                   | 12 ++++++------
+ pug/subscriptions.pug              |  2 +-
+ pug/takedown-video.pug             |  6 +++---
+ pug/takedown.pug                   |  8 ++++----
+ pug/video.pug                      |  8 ++++----
+ utils/converters.js                |  2 +-
+ 20 files changed, 46 insertions(+), 46 deletions(-)
+
+diff --git a/.github/workflows/docker-build.yml b/.github/workflows/docker-build.yml
+index 4e1356d..889ca14 100644
+--- a/.github/workflows/docker-build.yml
++++ b/.github/workflows/docker-build.yml
+@@ -7,7 +7,7 @@ jobs:
+   login:
+     runs-on: ubuntu-latest
+     env:
+-      PACKAGE_NAME: cloudtube
++      PACKAGE_NAME: cloudtube-ng
+ 
+     steps:
+       - name: Checkout
+diff --git a/api/proxy.js b/api/proxy.js
+index a6fecbe..6d0fd4e 100644
+--- a/api/proxy.js
++++ b/api/proxy.js
+@@ -17,7 +17,7 @@ module.exports = [
+ 			if (!fetchURL.toString().startsWith(instanceOrigin) || !authorizedPaths.some(element => fetchURL.pathname.match(new RegExp(`^${element}$`)))) {
+ 				return {
+ 					statusCode: 401,
+-					content: "CloudTube: Unauthorized",
++					content: "CloudTube-NG: Unauthorized",
+ 					contentType: "text/plain"
+ 				}
+ 			}
+diff --git a/api/video.js b/api/video.js
+index 7a01da4..137c0f1 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -102,7 +102,7 @@ module.exports = [
+ 			const id = url.searchParams.get("v");
+ 
+ 			if (settings.local === 2) {
+-				const dest = `https://www.youtube.com${url.pathname}${url.search}#cloudtube`;
++				const dest = `https://www.youtube.com${url.pathname}${url.search}#cloudtube-ng`;
+ 				user.addWatchedVideoMaybe(id);
+ 				return {
+ 					statusCode: 302,
+diff --git a/html/site.webmanifest b/html/site.webmanifest
+index 5e7bd86..64bd9d6 100644
+--- a/html/site.webmanifest
++++ b/html/site.webmanifest
+@@ -1,6 +1,6 @@
+ {
+-    "name": "CloudTube",
+-    "short_name": "CloudTube",
++    "name": "CloudTube-NG",
++    "short_name": "CloudTube-NG",
+     "icons": [
+         {
+             "src": "/static/images/android-chrome-192x192.png",
+diff --git a/pug/channel-error.pug b/pug/channel-error.pug
+index db4d226..53d5c2d 100644
+--- a/pug/channel-error.pug
++++ b/pug/channel-error.pug
+@@ -4,7 +4,7 @@ include includes/video-list-item
+ include includes/subscribe-button
+ 
+ block head
+-  title= `${data.row ? data.row.name : "Deleted channel"} - CloudTube`
++  title= `${data.row ? data.row.name : "Deleted channel"} - CloudTube-NG`
+   script(type="module" src=getStaticURL("html", "/static/js/channel.js"))
+ 
+ block content
+diff --git a/pug/channel.pug b/pug/channel.pug
+index fb83960..72808a6 100644
+--- a/pug/channel.pug
++++ b/pug/channel.pug
+@@ -4,7 +4,7 @@ include includes/video-list-item
+ include includes/subscribe-button
+ 
+ block head
+-  title= `${data.author} - CloudTube`
++  title= `${data.author} - CloudTube-NG`
+   script(type="module" src=getStaticURL("html", "/static/js/channel.js"))
+ 
+ block content
+diff --git a/pug/errors/fetch-error.pug b/pug/errors/fetch-error.pug
+index d763020..4e9708d 100644
+--- a/pug/errors/fetch-error.pug
++++ b/pug/errors/fetch-error.pug
+@@ -1,5 +1,5 @@
+ p The selected instance, #[code= instanceOrigin], was unreachable.
+ details
+   summary If the instance is on a private network
+-  p The instance URL was resolved by the server. If the instance is on a private network, CloudTube will not be able to connect back to it.
+-  p To get around this error, you may be able to use local mode, or you can run your own CloudTube within the network.
++  p The instance URL was resolved by the server. If the instance is on a private network, CloudTube-NG will not be able to connect back to it.
++  p To get around this error, you may be able to use local mode, or you can run your own CloudTube-NG within the network.
+diff --git a/pug/errors/rate-limited.pug b/pug/errors/rate-limited.pug
+index f3cd3b3..7032ddf 100644
+--- a/pug/errors/rate-limited.pug
++++ b/pug/errors/rate-limited.pug
+@@ -5,7 +5,7 @@
+       h3.actor You
+       | Working
+     .row
+-      h3.actor CloudTube
++      h3.actor CloudTube-NG
+       | Working
+     .row
+       h3.actor Instance
+@@ -14,7 +14,7 @@
+       h3.actor YouTube
+       | Working
+ p.
+-  CloudTube needs a working NewLeaf/Invidious instance in order to get data about videos.
++  CloudTube-NG needs a working NewLeaf/Invidious instance in order to get data about videos.
+   However, the selected instance, #[code= instanceOrigin], has been temporarily blocked by YouTube.
+ p.
+   You will be able to watch this video if you select a working instance in settings.
+diff --git a/pug/filters.pug b/pug/filters.pug
+index 2c6f2c1..61e4995 100644
+--- a/pug/filters.pug
++++ b/pug/filters.pug
+@@ -4,7 +4,7 @@ mixin filter_type_option(label, value)
+   option(value=value selected=(value === type))= label
+ 
+ block head
+-  title Filters - CloudTube
++  title Filters - CloudTube-NG
+   script(type="module" src=getStaticURL("html", "static/js/filters.js"))
+ 
+ block content
+diff --git a/pug/home.pug b/pug/home.pug
+index 5abafaf..bc281b5 100644
+--- a/pug/home.pug
++++ b/pug/home.pug
+@@ -1,11 +1,11 @@
+ extends includes/layout.pug
+ 
+ block head
+-  title Home - CloudTube
++  title Home - CloudTube-NG
+ 
+ block content
+   main.home-page
+-    h1.top-header CloudTube
++    h1.top-header CloudTube-NG
+     h2.tagline An alternative front-end for YouTube.
+     .encouraging-message
+       p You're in control. Watch things your way.
+diff --git a/pug/includes/layout.pug b/pug/includes/layout.pug
+index 29543c6..39947c3 100644
+--- a/pug/includes/layout.pug
++++ b/pug/includes/layout.pug
+@@ -12,8 +12,8 @@ html
+     link(rel="manifest" href="/site.webmanifest")
+     link(rel="mask-icon" href="/static/images/safari-pinned-tab.svg" color="#5bbad5")
+     link(rel="shortcut icon" href="/static/images/favicon.ico")
+-    meta(name="apple-mobile-web-app-title" content="CloudTube")
+-    meta(name="application-name" content="CloudTube")
++    meta(name="apple-mobile-web-app-title" content="Cloudtube-NG")
++    meta(name="application-name" content="Cloudtube-NG")
+     meta(name="msapplication-TileColor" content="#2b5797")
+     meta(name="msapplication-config" content="/browserconfig.xml")
+     meta(name="theme-color" content="#36393f")
+@@ -27,9 +27,9 @@ html
+       nav.main-nav
+         .links
+           if req && req.headers && "x-insecure" in req.headers
+-            a(href="/").link.home CloudTube - Insecure
++            a(href="/").link.home Cloudtube-NG - Insecure
+           else
+-            a(href="/").link.home CloudTube
++            a(href="/").link.home Cloudtube-NG
+           a(href="/subscriptions" title="Subscriptions").link.icon-link
+             != icons.get("subscriptions")
+           a(href="/settings" title="Settings").link.icon-link
+diff --git a/pug/local-video.pug b/pug/local-video.pug
+index f58aa70..6edadf0 100644
+--- a/pug/local-video.pug
++++ b/pug/local-video.pug
+@@ -4,14 +4,14 @@ include includes/video-list-item
+ include includes/subscribe-button
+ 
+ block head
+-  title Fetching... - CloudTube
++  title Fetching... - CloudTube-NG
+   script(type="module" src=getStaticURL("html", "/static/js/local-video.js"))
+   script const id = !{JSON.stringify(id)}
+ 
+ block content
+   main.video-error-page
+     h2 Fetching video
+-    p (You can also #[a(href=`https://www.youtube.com/watch?v=${id}#cloudtube`) watch on YouTube], #[a(href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md") install NewLeaf], or just #[a(href="/settings") turn off local fetch.])
++    p (You can also #[a(href=`https://www.youtube.com/watch?v=${id}#cloudtube-ng`) watch on YouTube], #[a(href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md") install NewLeaf], or just #[a(href="/settings") turn off local fetch.])
+     p#status.fetch-status Waiting...
+     form(method="post")#form.local-video-form
+       input(type="hidden" name="video")#video-data
+diff --git a/pug/privacy.pug b/pug/privacy.pug
+index 79ea564..83bbc40 100644
+--- a/pug/privacy.pug
++++ b/pug/privacy.pug
+@@ -9,20 +9,20 @@ block content
+     p This document contains details about the data this website collects, what it is used for, how it is stored, how it is shared, and how it can be removed.
+     h2 Data collected
+     h3 Data provided by you
+-    p CloudTube will store this information when you personally enter it into the site:
++    p CloudTube-NG will store this information when you personally enter it into the site:
+     ul
+       li personal settings
+       li list of channels you have subscribed to
+       li list of videos you have watched (only if enabled in settings)
+     h3 Data collected passively
+-    p When your device requests any resource from CloudTube, this information about the request may be stored for up to 14 days:
++    p When your device requests any resource from CloudTube-NG, this information about the request may be stored for up to 14 days:
+     ul
+       li the time the request was made
+       li the IP address
+       li the requested URL
+       li the response status code
+     h2 Accounts and cookies
+-    p CloudTube does not allow users to create accounts.
++    p CloudTube-NG does not allow users to create accounts.
+     p The first time a user personally provides data to the site, such as changing settings or subscribing to a channel, an ephemeral session is created and linked to a cookie.
+     p On future visits, this cookie will be used to look up the session, and provide a response based on that stored information.
+     p As described above, no personally identifiable information is linked to sessions.
+@@ -33,13 +33,13 @@ block content
+       li providing information for debugging
+     h2 How the data is shared
+     h3 With YouTube
+-    p YouTube is a company owned by Google, Inc. CloudTube displays information from YouTube.
+-    p When you perform a query on CloudTube that requires data from YouTube, such as making a search or loading a video, your query is forwarded to YouTube.
++    p YouTube is a company owned by Google, Inc. CloudTube-NG displays information from YouTube.
++    p When you perform a query on CloudTube-NG that requires data from YouTube, such as making a search or loading a video, your query is forwarded to YouTube.
+     p For example, when searching, YouTube receives a query for those search terms, and when watching a video, YouTube receives a page load for that video.
+     p When watching a video, your browser connects to googlevideo.com directly to request the video stream. This connection, and any data stored by YouTube as a result, is subject to #[a(href="https://policies.google.com/privacy") Google's privacy policy].
+     p All other queries are forwarded to your selected Invidious instance, which forwards them to YouTube. YouTube does not receive any metadata about you for these queries, only the query itself.
+     h3 With other organisations
+-    p CloudTube does not share any data with other people or organisations.
++    p CloudTube-NG does not share any data with other people or organisations.
+     h2 How to delete your data
+     p #[a(href="/settings") Visit the settings page] and find the "delete data" section. Read the text.
+     p To delete your data, check "I understand the consequences", then click "permanently erase my data".
+diff --git a/pug/search.pug b/pug/search.pug
+index cbfa60a..27d7050 100644
+--- a/pug/search.pug
++++ b/pug/search.pug
+@@ -3,7 +3,7 @@ extends includes/layout.pug
+ include includes/video-list-item.pug
+ 
+ block head
+-  title= `${query} (search) - CloudTube`
++  title= `${query} (search) - CloudTube-NG`
+ 
+ block content
+   main.search-page
+diff --git a/pug/settings.pug b/pug/settings.pug
+index 30f1157..11de381 100644
+--- a/pug/settings.pug
++++ b/pug/settings.pug
+@@ -29,7 +29,7 @@ mixin select({id, label, description, disabled, options})
+       .field-row__description!= description
+ 
+ block head
+-  title Settings - CloudTube
++  title Settings - CloudTube-NG
+ 
+ block content
+   main.settings-page
+@@ -49,7 +49,7 @@ block content
+         +input({
+           id: "instance",
+           label: "Instance",
+-          description: 'CloudTube will fetch information from this <a href="https://invidious.io/">Invidious</a> or <a href="https://git.sr.ht/~cadence/NewLeaf">NewLeaf</a> instance.',
++          description: 'CloudTube-NG will fetch information from this <a href="https://invidious.io/">Invidious</a> or <a href="https://git.sr.ht/~cadence/NewLeaf">NewLeaf</a> instance.',
+           type: "url",
+           placeholder: constants.user_settings.instance.default,
+           list: instances
+@@ -58,9 +58,9 @@ block content
+         +select({
+           id: "local",
+           label: "Play videos on",
+-          description: 'If CloudTube, the instance above will be used.\nIf YouTube, you will be redirected there.\nIf local, CloudTube will try to connect to a NewLeaf/Invidious instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
++          description: 'If CloudTube-NG, the instance above will be used.\nIf YouTube, you will be redirected there.\nIf local, CloudTube-NG will try to connect to a NewLeaf/Invidious instance running on your own computer. This can bypass blocks, but requires you to run the instance software.\nIf you wish to use local mode, <a href="https://git.sr.ht/~cadence/tube-docs/tree/main/item/docs/newleaf/Installing%20NewLeaf.md">read how to install NewLeaf.</a>',
+           options: [
+-            {value: "0", text: "CloudTube"},
++            {value: "0", text: "CloudTube-NG"},
+             {value: "2", text: "YouTube"},
+             {value: "1", text: "Local"},
+           ]
+@@ -112,7 +112,7 @@ block content
+     if user.token
+       details.data-management
+         summary Sync data
+-        p Open this link elsewhere to import your current CloudTube session there.
++        p Open this link elsewhere to import your current CloudTube-NG session there.
+         p.
+           If you clear your cookies often, you can bookmark this link and open it
+           to restore your data, or if you have multiple devices, you can send this
+@@ -123,7 +123,7 @@ block content
+ 
+       details.data-management.delete-details
+         summary Delete data
+-        p Press this button to erase all your data from CloudTube.
++        p Press this button to erase all your data from CloudTube-NG.
+         p.
+           Just the current session will be removed. If you lost access to a
+           previous session, you cannot touch it.
+diff --git a/pug/subscriptions.pug b/pug/subscriptions.pug
+index 7710f64..26e8bad 100644
+--- a/pug/subscriptions.pug
++++ b/pug/subscriptions.pug
+@@ -3,7 +3,7 @@ extends includes/layout.pug
+ include includes/video-list-item.pug
+ 
+ block head
+-  title Subscriptions - CloudTube
++  title Subscriptions - CloudTube-NG
+   script(type="module" src=getStaticURL("html", "/static/js/subscriptions.js"))
+ 
+ block content
+diff --git a/pug/takedown-video.pug b/pug/takedown-video.pug
+index e72224d..75a6915 100644
+--- a/pug/takedown-video.pug
++++ b/pug/takedown-video.pug
+@@ -4,7 +4,7 @@ include includes/video-list-item
+ include includes/subscribe-button
+ 
+ block head
+-  title Unavailable for legal reasons - CloudTube
++  title Unavailable for legal reasons - CloudTube-NG
+ 
+ block content
+   main.video-error-page
+@@ -15,8 +15,8 @@ block content
+     if url
+       p: a(href=url) More information about the notice is available here.
+     p Any content not covered by this notice is still available.
+-    p You can still #[a(href=`https://www.youtube.com/watch?v=${id}#cloudtube`) watch the video on YouTube.]
++    p You can still #[a(href=`https://www.youtube.com/watch?v=${id}#cloudtube-ng`) watch the video on YouTube.]
+     footer.takedown-footer
+       p: i Let this be a warning of why you shouldn't rely on centralised services!
+-      p: i You will always be able to download the CloudTube source code, or try another instance.
++      p: i You will always be able to download the CloudTube-NG source code, or try another instance.
+       p: i That's all we know.
+diff --git a/pug/takedown.pug b/pug/takedown.pug
+index c410788..baeef70 100644
+--- a/pug/takedown.pug
++++ b/pug/takedown.pug
+@@ -1,7 +1,7 @@
+ extends includes/layout
+ 
+ block head
+-  title Takedown - CloudTube
++  title Takedown - CloudTube-NG
+ 
+ block content
+   main.takedown-page
+@@ -10,9 +10,9 @@ block content
+     section.important-section
+       h2 Read this first.
+       ul
+-        li CloudTube is a proxy service for YouTube videos.
+-        li CloudTube does not store any videos. Videos are never saved to these servers.
+-        li CloudTube reproduces data from youtube.com in an interface that looks a little bit different.
++        li CloudTube-NG is a proxy service for YouTube videos.
++        li CloudTube-NG does not store any videos. Videos are never saved to these servers.
++        li CloudTube-NG reproduces data from youtube.com in an interface that looks a little bit different.
+         li All video data is streamed directly from YouTube. All video metadata is collected directly from YouTube.
+       h2 And understand this:
+       p Anybody can watch or download YouTube videos using many freely available tools. This is just one such tool, and attacking this website will solve none of your problems.
+diff --git a/pug/video.pug b/pug/video.pug
+index 6b1d1ae..d1f6963 100644
+--- a/pug/video.pug
++++ b/pug/video.pug
+@@ -5,9 +5,9 @@ include includes/subscribe-button
+ 
+ block head
+   unless error
+-    title= `${video.title} - CloudTube`
++    title= `${video.title} - CloudTube-NG`
+   else
+-    title Error - CloudTube
++    title Error - CloudTube-NG
+   script(type="module" src=getStaticURL("html", "/static/js/player.js"))
+   script(type="module" src=getStaticURL("html", "/static/js/chapter-highlight.js"))
+   script.
+@@ -79,7 +79,7 @@ block content
+               img(src="/static/images/search.svg" width=17 height=17 alt="").button-icon
+               | Search
+           //- button.border-look#share Share
+-          a(href=`https://www.youtube.com/watch?v=${video.videoId}#cloudtube`).border-look YouTube
++          a(href=`https://www.youtube.com/watch?v=${video.videoId}#cloudtube-ng`).border-look YouTube
+           a(href=`https://redirect.invidious.io/watch?v=${video.videoId}`).border-look Invidious
+ 
+         .description#description!= video.descriptionHtml
+@@ -135,4 +135,4 @@ block content
+     main.video-error-page
+       h2 Error
+       != message
+-      p: a(href=`https://www.youtube.com/watch?v=${video.videoId}#cloudtube`) Watch on YouTube →
++      p: a(href=`https://www.youtube.com/watch?v=${video.videoId}#cloudtube-ng`) Watch on YouTube →
+diff --git a/utils/converters.js b/utils/converters.js
+index c92f37d..be2d17f 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -65,7 +65,7 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 	// https://www.youtube.com/watch?v=VdPsJW6AHqc 00:00 timestamps, youtu.be/<videoid>
+ 	// https://www.youtube.com/watch?v=FDMq9ie0ih0 00:00 & 00:00:00 timestamps
+ 	// https://www.youtube.com/watch?v=fhum63fAwrI www.youtube.com/watch?v=<videoid>
+-	// https://www.youtube.com/watch?v=i-szWOrc3Mo www.youtube.com/<channelname> (unsupported by cloudtube currently)
++	// https://www.youtube.com/watch?v=i-szWOrc3Mo www.youtube.com/<channelname> (unsupported by Cloudtube-NG currently)
+ 	// https://www.youtube.com/watch?v=LSG71wbKpbQ www.youtube.com/channel/<id>
+ 	// https://www.youtube.com/watch?v=RiEkOKFOG3s youtu.be/<videoid> with params
+ 
+-- 
+2.54.0
+

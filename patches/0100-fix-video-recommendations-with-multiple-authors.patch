@@ -1,0 +1,86 @@
+From 40e8ed015f885c9afefe1f6ccbfc50aa0bf3daa1 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 26 May 2026 18:03:28 +0300
+Subject: [PATCH] fix video recommendations with multiple authors
+
+---
+ api/video.js                     | 35 ++++++++++++++++++++++++++++++++
+ pug/includes/video-list-item.pug |  2 +-
+ pug/video.pug                    |  2 +-
+ 3 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/api/video.js b/api/video.js
+index 137c0f1..96c4c62 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -150,6 +150,41 @@ module.exports = [
+ 				const formats = sortFormats(video, settings.quality);
+ 
+ 				video.recommendedVideos.forEach(converters.normaliseVideoInfo);
++				const searchCache = new Map()
++				for (const rec of video.recommendedVideos) {
++					if (!rec.authorId) {
++						const firstCreator = rec.author.split(/ and | ft\. | featuring | x | vs | ,/i)[0]
++						if (firstCreator) {
++							const match = video.recommendedVideos.find(v => v.author === firstCreator && v.authorId)
++							if (match) {
++								rec.authorId = match.authorId
++								rec.authorUrl = `/channel/${match.authorId}`
++							} else {
++								const dbRow = db.prepare("SELECT ucid FROM Channels WHERE name = ?").get(firstCreator)
++								if (dbRow) {
++									rec.authorId = dbRow.ucid
++									rec.authorUrl = `/channel/${dbRow.ucid}`
++								} else if (searchCache.has(firstCreator)) {
++									rec.authorId = searchCache.get(firstCreator)
++									rec.authorUrl = `/channel/${searchCache.get(firstCreator)}`
++								} else {
++									try {
++										const searchRes = await request(`${instanceOrigin}/api/v1/search?type=channel&q=${encodeURIComponent(firstCreator)}`).then(r => r.json())
++										if (Array.isArray(searchRes)) {
++											const found = searchRes.find(r => r.author === firstCreator && r.authorId) || searchRes[0]
++											if (found && found.authorId) {
++												rec.authorId = found.authorId
++												rec.authorUrl = `/channel/${found.authorId}`
++												searchCache.set(firstCreator, found.authorId)
++												try { db.prepare("REPLACE INTO Channels (ucid, name) VALUES (?, ?)").run(found.authorId, firstCreator) } catch (e) {}
++											}
++										}
++									} catch (e) {}
++								}
++							}
++						}
++					}
++				}
+ 				const {videos, filteredCount} = converters.applyVideoFilters(video.recommendedVideos, user.getFilters());
+ 				video.recommendedVideos = videos;
+ 
+diff --git a/pug/includes/video-list-item.pug b/pug/includes/video-list-item.pug
+index 84c4d76..048e126 100644
+--- a/pug/includes/video-list-item.pug
++++ b/pug/includes/video-list-item.pug
+@@ -20,7 +20,7 @@ mixin video_list_item(className, video, instanceOrigin, options = {})
+     .info
+       div.title: a(href=link).title-link= video.title
+       div.author-line
+-        a(href=`/channel/${video.authorId}`).author= video.author
++        a(href=video.authorUrl || `/channel/${video.authorId}`).author= video.author
+         - const views = video.viewCountText || video.second__viewCountText
+         if views
+           = ` • `
+diff --git a/pug/video.pug b/pug/video.pug
+index d1f6963..54e7456 100644
+--- a/pug/video.pug
++++ b/pug/video.pug
+@@ -48,7 +48,7 @@ block content
+           header.info-main
+             h1.title= video.title
+             .author
+-              a(href=`/channel/${video.authorId}`).author-link= `Uploaded by ${video.author}`
++              a(href=video.authorUrl || `/channel/${video.authorId}`).author-link= `Uploaded by ${video.author}`
+           .info-secondary
+             - const date = new Date(video.published*1000)
+             - const month = new Intl.DateTimeFormat("en-US", {month: "short"}).format(date.getTime())
+-- 
+2.54.0
+
