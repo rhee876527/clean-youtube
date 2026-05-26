@@ -20,7 +20,7 @@ mixin video_list_item(className, video, instanceOrigin, options = {})
     .info
       div.title: a(href=link).title-link= video.title
       div.author-line
-        a(href=`/channel/${video.authorId}`).author= video.author
+        a(href=video.authorUrl || `/channel/${video.authorId}`).author= video.author
         - const views = video.viewCountText || video.second__viewCountText
         if views
           = ` • `

@@ -48,7 +48,7 @@ block content
           header.info-main
             h1.title= video.title
             .author
-              a(href=`/channel/${video.authorId}`).author-link= `Uploaded by ${video.author}`
+              a(href=video.authorUrl || `/channel/${video.authorId}`).author-link= `Uploaded by ${video.author}`
           .info-secondary
             - const date = new Date(video.published*1000)
             - const month = new Intl.DateTimeFormat("en-US", {month: "short"}).format(date.getTime())

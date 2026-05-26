@@ -150,6 +150,41 @@ module.exports = [
 				const formats = sortFormats(video, settings.quality);
 
 				video.recommendedVideos.forEach(converters.normaliseVideoInfo);
+				const searchCache = new Map()
+				for (const rec of video.recommendedVideos) {
+					if (!rec.authorId) {
+						const firstCreator = rec.author.split(/ and | ft\. | featuring | x | vs | ,/i)[0]
+						if (firstCreator) {
+							const match = video.recommendedVideos.find(v => v.author === firstCreator && v.authorId)
+							if (match) {
+								rec.authorId = match.authorId
+								rec.authorUrl = `/channel/${match.authorId}`
+							} else {
+								const dbRow = db.prepare("SELECT ucid FROM Channels WHERE name = ?").get(firstCreator)
+								if (dbRow) {
+									rec.authorId = dbRow.ucid
+									rec.authorUrl = `/channel/${dbRow.ucid}`
+								} else if (searchCache.has(firstCreator)) {
+									rec.authorId = searchCache.get(firstCreator)
+									rec.authorUrl = `/channel/${searchCache.get(firstCreator)}`
+								} else {
+									try {
+										const searchRes = await request(`${instanceOrigin}/api/v1/search?type=channel&q=${encodeURIComponent(firstCreator)}`).then(r => r.json())
+										if (Array.isArray(searchRes)) {
+											const found = searchRes.find(r => r.author === firstCreator && r.authorId) || searchRes[0]
+											if (found && found.authorId) {
+												rec.authorId = found.authorId
+												rec.authorUrl = `/channel/${found.authorId}`
+												searchCache.set(firstCreator, found.authorId)
+												try { db.prepare("REPLACE INTO Channels (ucid, name) VALUES (?, ?)").run(found.authorId, firstCreator) } catch (e) {}
+											}
+										}
+									} catch (e) {}
+								}
+							}
+						}
+					}
+				}
 				const {videos, filteredCount} = converters.applyVideoFilters(video.recommendedVideos, user.getFilters());
 				video.recommendedVideos = videos;
 
