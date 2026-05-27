@@ -7,10 +7,14 @@ const db = require("../utils/db")
 
 const prepared = {
 	video_insert: db.prepare(
-		"INSERT OR IGNORE INTO Videos"
+		"INSERT INTO Videos"
 			+ " ( videoId,  title,  author,  authorId,  published,  viewCountText,  descriptionHtml)"
 			+ " VALUES"
 			+ " (@videoId, @title, @author, @authorId, @published, @viewCountText, @descriptionHtml)"
+			+ " ON CONFLICT(videoId) DO UPDATE SET"
+			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL THEN excluded.viewCountText ELSE viewCountText END,"
+			+ " descriptionHtml = CASE WHEN excluded.descriptionHtml IS NOT NULL THEN excluded.descriptionHtml ELSE descriptionHtml END,"
+			+ " published = CASE WHEN published IS NULL THEN excluded.published ELSE published END"
 	),
 	channel_refreshed_update: db.prepare(
 		"UPDATE Channels SET refreshed = ? WHERE ucid = ?"
@@ -83,6 +87,7 @@ class Refresher {
 			if (videos.length > 0) {
 				videos.forEach(video => {
 					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
+					if (!video.videoId && !video.playlistId) return
 					const row = {
 						videoId: video.videoId ?? video.playlistId,
 						title: video.title,

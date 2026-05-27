@@ -28,7 +28,7 @@ module.exports = [
 					hasSubscriptions = true
 					videos = db.prepare(`SELECT Videos.* FROM Videos INNER JOIN Subscriptions ON Videos.authorID = Subscriptions.ucid WHERE token = ? ORDER BY published DESC LIMIT 60`).all(user.token)
 						.map(video => {
-							video.publishedText = timeToPastText(video.published * 1000)
+							video.publishedText = video.published ? timeToPastText(video.published * 1000) : null
 							video.watched = watchedVideos.includes(video.videoId)
 							video.descriptionHtml = video.descriptionHtml ? rewriteVideoDescription(video.descriptionHtml, video.videoId) : ''
 							return video
