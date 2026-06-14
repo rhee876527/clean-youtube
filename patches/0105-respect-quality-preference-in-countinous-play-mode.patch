@@ -1,0 +1,24 @@
+From 0e292fcbf7e92e73b57f9816fc011cc23cb7da0a Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 14 Jun 2026 10:17:32 +0300
+Subject: [PATCH] respect quality preference in countinous play mode
+
+---
+ api/video.js | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/api/video.js b/api/video.js
+index 96c4c62..d59d33e 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -124,7 +124,6 @@ module.exports = [
+ 			const swp = url.searchParams.get("session-watched");
+ 			const sessionWatched = swp ? swp.split(" ") : [];
+ 			const sessionWatchedNext = [...sessionWatched, id].join("+");
+-			if (continuous) settings.quality = 0;
+ 
+ 			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
+ 			const videoFuture = req.method === "GET"
+-- 
+2.54.0
+

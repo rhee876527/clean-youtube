@@ -1,0 +1,54 @@
+From f9cfcfd73f1d8629347613781b2e5cedc0f93cf6 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 27 May 2026 17:11:54 +0300
+Subject: [PATCH] adapt subscriptions to handle mixed api responses
+
+---
+ api/subscriptions.js      | 2 +-
+ background/feed-update.js | 7 ++++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/api/subscriptions.js b/api/subscriptions.js
+index 1ed803d..7547497 100644
+--- a/api/subscriptions.js
++++ b/api/subscriptions.js
+@@ -28,7 +28,7 @@ module.exports = [
+ 					hasSubscriptions = true
+ 					videos = db.prepare(`SELECT Videos.* FROM Videos INNER JOIN Subscriptions ON Videos.authorID = Subscriptions.ucid WHERE token = ? ORDER BY published DESC LIMIT 60`).all(user.token)
+ 						.map(video => {
+-							video.publishedText = timeToPastText(video.published * 1000)
++							video.publishedText = video.published ? timeToPastText(video.published * 1000) : null
+ 							video.watched = watchedVideos.includes(video.videoId)
+ 							video.descriptionHtml = video.descriptionHtml ? rewriteVideoDescription(video.descriptionHtml, video.videoId) : ''
+ 							return video
+diff --git a/background/feed-update.js b/background/feed-update.js
+index 5012927..62f0d5a 100644
+--- a/background/feed-update.js
++++ b/background/feed-update.js
+@@ -7,10 +7,14 @@ const db = require("../utils/db")
+ 
+ const prepared = {
+ 	video_insert: db.prepare(
+-		"INSERT OR IGNORE INTO Videos"
++		"INSERT INTO Videos"
+ 			+ " ( videoId,  title,  author,  authorId,  published,  viewCountText,  descriptionHtml)"
+ 			+ " VALUES"
+ 			+ " (@videoId, @title, @author, @authorId, @published, @viewCountText, @descriptionHtml)"
++			+ " ON CONFLICT(videoId) DO UPDATE SET"
++			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL THEN excluded.viewCountText ELSE viewCountText END,"
++			+ " descriptionHtml = CASE WHEN excluded.descriptionHtml IS NOT NULL THEN excluded.descriptionHtml ELSE descriptionHtml END,"
++			+ " published = CASE WHEN published IS NULL THEN excluded.published ELSE published END"
+ 	),
+ 	channel_refreshed_update: db.prepare(
+ 		"UPDATE Channels SET refreshed = ? WHERE ucid = ?"
+@@ -83,6 +87,7 @@ class Refresher {
+ 			if (videos.length > 0) {
+ 				videos.forEach(video => {
+ 					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
++					if (!video.videoId && !video.playlistId) return
+ 					const row = {
+ 						videoId: video.videoId ?? video.playlistId,
+ 						title: video.title,
+-- 
+2.54.0
+

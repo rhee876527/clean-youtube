@@ -1,0 +1,25 @@
+From 08d9fae0b983a8cab201591a11aca7706c26383b Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 14 Jun 2026 10:22:55 +0300
+Subject: [PATCH] skip readyState guards for continous mode
+
+---
+ html/static/js/player.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 89f9a0e..3429548 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -997,7 +997,7 @@ document.addEventListener("keydown", async (event) => {
+         isPlaybackActionPending = true;
+ 
+         // Check if both elements are ready before attempting playback
+-        if (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2)) {
++        if (!data.continuous && (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2))) {
+             console.log("Media not ready, skipping playback attempt");
+             isPlaybackActionPending = false;
+             return; // prevent further handling but don't play
+-- 
+2.54.0
+

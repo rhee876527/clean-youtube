@@ -1,0 +1,43 @@
+From 40957de7dd71b61144b5409ea838381f422962e6 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 14 Jun 2026 11:13:33 +0300
+Subject: [PATCH] slow down undesired progression pre-drift correction
+
+---
+ html/static/js/player.js | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 3429548..a5571db 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -760,6 +760,7 @@ const firefoxCorrectionCooldown = 500; // ms
+ if (isChrome) {
+     let driftLocked = false;
+     let resumeCheckRunning = false;
++    let savedPlaybackRate = 1.0;
+ 
+     function monitorDrift(now, metadata) {
+         if (!formatLoader.npa || freezePlayback) {
+@@ -782,6 +783,9 @@ if (isChrome) {
+                 audioElement.currentTime = videoTime;
+             } else {
+                 driftLocked = true;
++                savedPlaybackRate = videoElement.playbackRate;
++                videoElement.playbackRate = 0.25;
++                audioElement.playbackRate = 0.25;
+                 videoElement.pause();
+                 startResumeMonitor();
+             }
+@@ -805,6 +809,8 @@ if (isChrome) {
+             if (bufferLead >= minBufferLead + 1.0) {
+                 audioElement.currentTime = videoElement.currentTime;
+ 
++                videoElement.playbackRate = savedPlaybackRate;
++                audioElement.playbackRate = savedPlaybackRate;
+                 videoElement.play().catch(() => {});
+                 audioElement.play().catch(() => {});
+ 
+-- 
+2.54.0
+

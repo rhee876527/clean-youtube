@@ -1,0 +1,26 @@
+From 3d29c229de1cb4e8f03c9e38af95a5c6059569ba Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 26 May 2026 18:23:21 +0300
+Subject: [PATCH] fix videoid in channels
+
+---
+ utils/converters.js | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/utils/converters.js b/utils/converters.js
+index be2d17f..0cd4bf4 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -40,6 +40,9 @@ function lengthSecondsToLengthText(seconds) {
+  * - second__viewCountText is added
+  */
+ function normaliseVideoInfo(video) {
++	if (!video.videoId && video.playlistId) {
++		video.videoId = video.playlistId
++	}
+ 	if (!video.second__lengthText && video.lengthSeconds > 0) {
+ 		video.second__lengthText = lengthSecondsToLengthText(video.lengthSeconds)
+ 	}
+-- 
+2.54.0
+
