@@ -124,7 +124,6 @@ module.exports = [
 			const swp = url.searchParams.get("session-watched");
 			const sessionWatched = swp ? swp.split(" ") : [];
 			const sessionWatchedNext = [...sessionWatched, id].join("+");
-			if (continuous) settings.quality = 0;
 
 			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
 			const videoFuture = req.method === "GET"
