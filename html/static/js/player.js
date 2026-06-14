@@ -760,6 +760,7 @@ const firefoxCorrectionCooldown = 500; // ms
 if (isChrome) {
     let driftLocked = false;
     let resumeCheckRunning = false;
+    let savedPlaybackRate = 1.0;
 
     function monitorDrift(now, metadata) {
         if (!formatLoader.npa || freezePlayback) {
@@ -782,6 +783,9 @@ if (isChrome) {
                 audioElement.currentTime = videoTime;
             } else {
                 driftLocked = true;
+                savedPlaybackRate = videoElement.playbackRate;
+                videoElement.playbackRate = 0.25;
+                audioElement.playbackRate = 0.25;
                 videoElement.pause();
                 startResumeMonitor();
             }
@@ -805,6 +809,8 @@ if (isChrome) {
             if (bufferLead >= minBufferLead + 1.0) {
                 audioElement.currentTime = videoElement.currentTime;
 
+                videoElement.playbackRate = savedPlaybackRate;
+                audioElement.playbackRate = savedPlaybackRate;
                 videoElement.play().catch(() => {});
                 audioElement.play().catch(() => {});
 
