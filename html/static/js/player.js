@@ -997,7 +997,7 @@ document.addEventListener("keydown", async (event) => {
         isPlaybackActionPending = true;
 
         // Check if both elements are ready before attempting playback
-        if (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2)) {
+        if (!data.continuous && (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2))) {
             console.log("Media not ready, skipping playback attempt");
             isPlaybackActionPending = false;
             return; // prevent further handling but don't play
