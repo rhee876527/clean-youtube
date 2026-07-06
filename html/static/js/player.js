@@ -590,13 +590,13 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
 
             // Primary checks: multiple detection strategies to catch ready state early
-            
+
             // 1. Buffer ahead check - most reliable
             if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) return resolve();
-            
+
             // 2. ReadyState check - if both are HAVE_FUTURE_DATA or better, media is ready
             if (videoEl.readyState >= 3 && audioEl.readyState >= 3) return resolve();
-            
+
             // 3. Fallback timeout - if resuming from pause and timeout exceeded, proceed anyway
             if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve();
 
@@ -799,8 +799,8 @@ if (isChrome) {
             } else {
                 driftLocked = true;
                 savedPlaybackRate = videoElement.playbackRate;
-                videoElement.playbackRate = 0.25;
-                audioElement.playbackRate = 0.25;
+                videoElement.playbackRate = 0.0625;
+                audioElement.playbackRate = 0.0625;
                 videoElement.pause();
                 startResumeMonitor();
             }
