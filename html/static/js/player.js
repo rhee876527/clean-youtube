@@ -468,7 +468,7 @@ function startSyncCheck() {
         const audioTime = audioElement.currentTime;
         const drift = videoTime - audioTime;
 
-        if (Math.abs(drift) > driftThreshold) {
+        if (Math.abs(drift) > driftThreshold && videoElement.playbackRate <= 1) {
             // Check if audio buffer is sufficient before correcting
             const audioEnd = audioElement.buffered.length
                 ? audioElement.buffered.end(audioElement.buffered.length - 1)
@@ -793,7 +793,7 @@ if (isChrome) {
 
         const bufferLead = audioEnd - videoTime;
 
-        if (!driftLocked && Math.abs(drift) > chromedriftThreshold) {
+        if (!driftLocked && Math.abs(drift) > chromedriftThreshold && videoElement.playbackRate <= 1) {
             if (bufferLead >= minBufferLead) {
                 audioElement.currentTime = videoTime;
             } else {
