@@ -665,7 +665,22 @@ videoElement.addEventListener("playing", () => {
     if (wasPlayingBeforeBuffer && formatLoader.npa) {
         wasPlayingBeforeBuffer = false;
         audioElement.muted = false;
-        audioElement.currentTime = videoElement.currentTime;
+        // Only re-sync audio if the target is actually buffered.
+        // On bandwidth-starved connections, this seek would land on
+        // consumed data (no buffer), forcing audio to stall again →
+        // video plays ahead → drift monitor pauses/re-resumes →
+        // `playing` fires → seek misses again → flapping cycle.
+        // The drift monitor (Chrome 0.15s, Firefox 0.3s) corrects
+        // naturally when enough buffer accumulates, so skipping the
+        // seek here is safe — at worst ~2 frames of desync.
+        const t = videoElement.currentTime;
+        const b = audioElement.buffered;
+        for (let i = 0; i < b.length; i++) {
+            if (t >= b.start(i) - 0.1 && t <= b.end(i)) {
+                audioElement.currentTime = t;
+                break;
+            }
+        }
     }
 });
 
