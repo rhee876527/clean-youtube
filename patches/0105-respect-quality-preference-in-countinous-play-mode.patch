@@ -20,5 +20,5 @@ index 96c4c62..d59d33e 100644
  			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
  			const videoFuture = req.method === "GET"
 -- 
-2.54.0
+2.55.0
 

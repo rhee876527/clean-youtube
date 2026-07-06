@@ -1,0 +1,45 @@
+From 77f7b5f0414aab52a561d2f8ef6a9f7ab924f46e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 6 Jul 2026 19:01:19 +0300
+Subject: [PATCH] double down on this great idea from
+ 40957de7dd71b61144b5409ea838381f422962e6
+
+---
+ html/static/js/player.js | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 2aa29e8..3b8876e 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -590,13 +590,13 @@ async function waitForAudioThenPlay(videoEl, audioEl, signal) {
+             if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+ 
+             // Primary checks: multiple detection strategies to catch ready state early
+-            
++
+             // 1. Buffer ahead check - most reliable
+             if (getBufferedAhead(audioEl, videoEl.currentTime) >= requiredBuffer) return resolve();
+-            
++
+             // 2. ReadyState check - if both are HAVE_FUTURE_DATA or better, media is ready
+             if (videoEl.readyState >= 3 && audioEl.readyState >= 3) return resolve();
+-            
++
+             // 3. Fallback timeout - if resuming from pause and timeout exceeded, proceed anyway
+             if (wasPaused && performance.now() - startTime >= resumeTimeout) return resolve();
+ 
+@@ -799,8 +799,8 @@ if (isChrome) {
+             } else {
+                 driftLocked = true;
+                 savedPlaybackRate = videoElement.playbackRate;
+-                videoElement.playbackRate = 0.25;
+-                audioElement.playbackRate = 0.25;
++                videoElement.playbackRate = 0.0625;
++                audioElement.playbackRate = 0.0625;
+                 videoElement.pause();
+                 startResumeMonitor();
+             }
+-- 
+2.55.0
+

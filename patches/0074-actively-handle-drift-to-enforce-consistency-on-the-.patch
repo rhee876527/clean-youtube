@@ -64,5 +64,5 @@ index 622b2c3..f6721a7 100644
  const videoObserver = new IntersectionObserver((entries) => {
      entries.forEach(entry => {
 -- 
-2.54.0
+2.55.0
 
