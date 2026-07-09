@@ -1,0 +1,45 @@
+From 94ddf2e598b6daf9ab3d4be27b9c40ad4a1956f2 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 6 Jul 2026 19:54:54 +0300
+Subject: [PATCH] clear node 20 warnings for gh actions
+
+---
+ .github/workflows/docker-build.yml | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/.github/workflows/docker-build.yml b/.github/workflows/docker-build.yml
+index 889ca14..af76e87 100644
+--- a/.github/workflows/docker-build.yml
++++ b/.github/workflows/docker-build.yml
+@@ -11,23 +11,23 @@ jobs:
+ 
+     steps:
+       - name: Checkout
+-        uses: actions/checkout@v4
++        uses: actions/checkout@v7
+ 
+       - name: Set up QEMU
+-        uses: docker/setup-qemu-action@v3
++        uses: docker/setup-qemu-action@v4
+ 
+       - name: Set up Docker Buildx
+-        uses: docker/setup-buildx-action@v3
++        uses: docker/setup-buildx-action@v4
+ 
+       - name: Login to GitHub Container Registry
+-        uses: docker/login-action@v3
++        uses: docker/login-action@v4
+         with:
+           registry: ghcr.io
+           username: ${{ github.repository_owner }}
+           password: ${{ secrets.GITHUB_TOKEN }}
+ 
+       - name: Build and push Docker image
+-        uses: docker/build-push-action@v5
++        uses: docker/build-push-action@v7
+         with:
+           context: .
+           push: true
+-- 
+2.55.0
+

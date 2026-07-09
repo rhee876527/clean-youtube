@@ -1,0 +1,165 @@
+From e2edaf01703a7efb98bf546b0acaead39d011ccb Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 9 Jul 2026 12:23:37 +0300
+Subject: [PATCH] fix timestamps/links in description & comments
+
+---
+ api/video.js        | 20 ++++++++++-
+ utils/converters.js | 86 +++++++++++++++++++++++++++++++++------------
+ 2 files changed, 82 insertions(+), 24 deletions(-)
+
+diff --git a/api/video.js b/api/video.js
+index d59d33e..f480b23 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -209,9 +209,17 @@ module.exports = [
+ 					caption.url = `/proxy?${new URLSearchParams({url: caption.url})}`;
+ 				});
+ 
++			const comments = (commentsData.comments || []).map(c => ({
++				...c,
++				contentHtml: converters.wrapTimestamps(
++					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
++					id
++				)
++			}));
++
+ 				return render(200, "pug/video.pug", {
+ 					req, url, video, formats, subscribed, instanceOrigin, mediaFragment, autoplay, continuous,
+-					sessionWatched, sessionWatchedNext, settings, comments: commentsData.comments || []
++					sessionWatched, sessionWatchedNext, settings, comments
+ 				});
+ 
+ 			} catch (error) {
+@@ -249,6 +257,16 @@ module.exports = [
+ 				const response = await request(`${instanceOrigin}/api/v1/comments/${videoId}?continuation=${encodeURIComponent(continuation)}`);
+ 				const data = await response.json();
+ 
++				if (data.comments) {
++				data.comments = data.comments.map(c => ({
++					...c,
++					contentHtml: converters.wrapTimestamps(
++						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
++						videoId
++					)
++				}));
++				}
++
+ 				return {
+ 					statusCode: 200,
+ 					contentType: "application/json",
+diff --git a/utils/converters.js b/utils/converters.js
+index 0cd4bf4..0ef14f4 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -61,7 +61,62 @@ function normaliseVideoInfo(video) {
+ 	}
+ }
+ 
++/**
++ * Strip Invidious pre-built chapter links from HTML content.
++ * Invidious wraps chapter fragments in <a> with data-jump-time,
++ * but the timestamps are often wrong and the text is fragmented.
++ */
++function stripInvidiousChapterLinks(html) {
++	return html.replace(/<a[^>]*data-jump-time="[^"]*"[^>]*>([^<]*)<\/a>/g, "$1")
++}
++
++/**
++ * Fix broken YouTube links that Invidious incorrectly converts to relative paths.
++ * Invidious turns <a href="https://www.youtube.com/whatever/join"> into
++ * <a href="/whatever/join">youtube.com/whatever/join</a> which is broken on the instance.
++ * Skip /watch?v= and /channel/ links which should stay local.
++ */
++function fixBrokenYoutubeLinks(html) {
++	return html.replace(/<a href="\/(?!(?:watch\?|channel\/))([^"]+)">youtube\.com\/([^<]+)<\/a>/g, (_, path, text) => {
++		return `<a href="https://www.youtube.com/${path}">youtube.com/${text}</a>`
++	})
++}
++
+ const timeDisplayCompiled = pug.compile(`a(href=url data-clickable-timestamp=timeSeconds)= timeDisplay`)
++
++function wrapTimestamps(html, id) {
++	const parts = html.split(/(<a\b[^>]*>|<\/a>)/gi)
++	let depth = 0
++	for (let i = 0; i < parts.length; i++) {
++		if (/^<a\b/i.test(parts[i])) {
++			depth++
++		} else if (parts[i] === '</a>') {
++			depth--
++		} else if (depth === 0) {
++			parts[i] = parts[i].replace(new RegExp(`(?:([0-9]*):)?([0-5]?[0-9]):([0-5][0-9])`, "g"), (_, hours, minutes, seconds) => {
++				let timeURL, timeDisplay, timeSeconds
++				if (hours === undefined) {
++					timeURL = `${minutes}m${seconds}s`
++					timeDisplay = `${minutes}:${seconds}`
++					timeSeconds = minutes*60 + + seconds
++				} else {
++					timeURL = `${hours}h${minutes}m${seconds}s`
++					timeDisplay = `${hours}:${minutes}:${seconds}`
++					timeSeconds = hours*60*60 + minutes*60 + + seconds
++				}
++
++				const params = new URLSearchParams()
++				params.set("v", id)
++				params.set("t", timeURL)
++				const url = "/watch?" + params
++
++				return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds: String(timeSeconds)})
++			})
++		}
++	}
++	return parts.join('')
++}
++
+ function rewriteVideoDescription(descriptionHtml, id) {
+ 	// replace timestamps to clickable links and rewrite youtube links to stay on the instance instead of pointing to YouTube
+ 	// test cases
+@@ -80,29 +135,11 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 		}
+ 	})
+ 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu(?:\\.be|be\\.com)/([^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
+-	descriptionHtml = descriptionHtml.replace(new RegExp(`(?:([0-9]*):)?([0-5]?[0-9]):([0-5][0-9])`, "g"), (_, hours, minutes, seconds) => {
+-		let timeURL, timeDisplay, timeSeconds
+-		if (hours === undefined) {
+-			timeURL = `${minutes}m${seconds}s`
+-			timeDisplay = `${minutes}:${seconds}`
+-			timeSeconds = minutes*60 + + seconds
+-		} else {
+-			timeURL = `${hours}h${minutes}m${seconds}s`
+-			timeDisplay = `${hours}:${minutes}:${seconds}`
+-			timeSeconds = hours*60*60 + minutes*60 + + seconds
+-		}
+-
+-		const params = new URLSearchParams()
+-		params.set("v", id)
+-		params.set("t", timeURL)
+-		const url = "/watch?" + params
+-
+-		// Ensure the data-clickable-timestamp attribute contains a plain
+-		// numeric string (seconds). Passing a string avoids cases where the
+-		// attribute could contain formats like "3:00" or "3m00s" which
+-		// front-end parseFloat would misinterpret (e.g. parseFloat("3:00") === 3).
+-		return timeDisplayCompiled({url, timeURL, timeDisplay, timeSeconds: String(timeSeconds)})
+-	})
++	// Strip Invidious pre-built chapter links (they have wrong timestamps and fragment text)
++	descriptionHtml = stripInvidiousChapterLinks(descriptionHtml)
++	// Fix broken YouTube links (youtube.com/path as relative links)
++	descriptionHtml = fixBrokenYoutubeLinks(descriptionHtml)
++	descriptionHtml = wrapTimestamps(descriptionHtml, id)
+ 
+ 	return descriptionHtml
+ }
+@@ -201,6 +238,9 @@ module.exports.timeToPastText = timeToPastText
+ module.exports.lengthSecondsToLengthText = lengthSecondsToLengthText
+ module.exports.normaliseVideoInfo = normaliseVideoInfo
+ module.exports.rewriteVideoDescription = rewriteVideoDescription
++module.exports.wrapTimestamps = wrapTimestamps
++module.exports.stripInvidiousChapterLinks = stripInvidiousChapterLinks
++module.exports.fixBrokenYoutubeLinks = fixBrokenYoutubeLinks
+ module.exports.tToMediaFragment = tToMediaFragment
+ module.exports.viewCountToText = viewCountToText
+ module.exports.subscriberCountToText = subscriberCountToText
+-- 
+2.55.0
+
