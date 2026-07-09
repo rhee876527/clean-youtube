@@ -209,9 +209,17 @@ module.exports = [
 					caption.url = `/proxy?${new URLSearchParams({url: caption.url})}`;
 				});
 
+			const comments = (commentsData.comments || []).map(c => ({
+				...c,
+				contentHtml: converters.wrapTimestamps(
+					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
+					id
+				)
+			}));
+
 				return render(200, "pug/video.pug", {
 					req, url, video, formats, subscribed, instanceOrigin, mediaFragment, autoplay, continuous,
-					sessionWatched, sessionWatchedNext, settings, comments: commentsData.comments || []
+					sessionWatched, sessionWatchedNext, settings, comments
 				});
 
 			} catch (error) {
@@ -248,6 +256,16 @@ module.exports = [
 			try {
 				const response = await request(`${instanceOrigin}/api/v1/comments/${videoId}?continuation=${encodeURIComponent(continuation)}`);
 				const data = await response.json();
+
+				if (data.comments) {
+				data.comments = data.comments.map(c => ({
+					...c,
+					contentHtml: converters.wrapTimestamps(
+						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
+						videoId
+					)
+				}));
+				}
 
 				return {
 					statusCode: 200,
