@@ -237,6 +237,63 @@ module.exports = [
 		}
 	},
 	{
+		route: "/api/captions/vtt", methods: ["GET"], code: async ({req, url}) => {
+			const user = getUser(req);
+			const settings = user.getSettingsOrDefaults();
+			const videoId = url.searchParams.get("v");
+			const label = url.searchParams.get("label");
+
+			if (!videoId || !label) {
+				return {
+					statusCode: 400,
+					contentType: "text/plain",
+					content: "Missing v or label"
+				};
+			}
+
+			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
+
+			try {
+				const watchRes = await fetch(`${instanceOrigin}/watch?v=${videoId}`);
+				if (!watchRes.ok) throw new Error("Failed to fetch watch page");
+				const watchHtml = await watchRes.text();
+
+				const trackRegex = /<track\s[^>]*kind="captions"[^>]*>/gi;
+				let companionUrl = null;
+				let match;
+				while ((match = trackRegex.exec(watchHtml)) !== null) {
+					const srcMatch = match[0].match(/src="([^"]+)"/);
+					const labelMatch = match[0].match(/label="([^"]+)"/);
+					if (srcMatch && labelMatch && labelMatch[1] === label) {
+						companionUrl = srcMatch[1];
+						break;
+					}
+				}
+
+				if (!companionUrl) throw new Error("No matching caption found");
+
+				const captionRes = await fetch(companionUrl);
+				const vtt = await captionRes.text();
+
+				return {
+					statusCode: 200,
+					contentType: "text/vtt; charset=UTF-8",
+					content: vtt,
+					headers: {
+						"Access-Control-Allow-Origin": "*",
+						"Cache-Control": "public, max-age=86400"
+					}
+				};
+			} catch (error) {
+				return {
+					statusCode: 500,
+					contentType: "text/plain",
+					content: "Failed to load captions"
+				};
+			}
+		}
+	},
+	{
 		route: "/api/comments", methods: ["GET"], code: async ({req, url}) => {
 			const user = getUser(req);
 			const settings = user.getSettingsOrDefaults();

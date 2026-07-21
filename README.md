@@ -12,6 +12,7 @@ Features added:
 - Uses MediaSession API for external media control.
 - Comments from invidious API.
 - Retry Youtube 403 errors with proxy.
+- Captions from invidious companion
 
 Notes:
 - Requires a WORKING invidious instance.

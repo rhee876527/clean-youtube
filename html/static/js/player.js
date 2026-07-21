@@ -1153,3 +1153,4 @@ document.addEventListener('seekToTimestamp', async (event) => {
     const href = link instanceof HTMLAnchorElement ? link.href : null;
     await seekToTimestamp(time, href);
 });
+

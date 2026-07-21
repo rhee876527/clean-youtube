@@ -3,7 +3,10 @@ const {getUser} = require("../utils/getuser")
 const constants = require("../utils/constants.js")
 
 // list of paths relative to the backend this route is authorized to serve
-const authorizedPaths = [`/api/v1/captions/(${constants.regex.video_id})`]
+const authorizedPaths = [
+	`/api/v1/captions/(${constants.regex.video_id})`,
+	`/companion/api/v1/captions/(${constants.regex.video_id})`
+]
 
 // headers relayed as-is from the proxied backend to the client
 const proxiedHeaders = ["content-type", "date", "last-modified", "expires", "cache-control", "accept-ranges", "content-range", "origin", "etag", "content-length", "transfer-encoding"]
