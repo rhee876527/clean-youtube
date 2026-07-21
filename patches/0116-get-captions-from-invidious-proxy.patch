@@ -1,0 +1,137 @@
+From 77b0cfe3694d722d1b2f2804bbee7df87e380e13 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Tue, 21 Jul 2026 12:38:43 +0300
+Subject: [PATCH] get captions from invidious proxy
+
+---
+ README.md                |  1 +
+ api/proxy.js             |  5 +++-
+ api/video.js             | 57 ++++++++++++++++++++++++++++++++++++++++
+ html/static/js/player.js |  3 ++-
+ pug/video.pug            |  2 +-
+ 5 files changed, 65 insertions(+), 3 deletions(-)
+
+diff --git a/README.md b/README.md
+index bc64c3c..acf5d90 100644
+--- a/README.md
++++ b/README.md
+@@ -12,6 +12,7 @@ Features added:
+ - Uses MediaSession API for external media control.
+ - Comments from invidious API.
+ - Retry Youtube 403 errors with proxy.
++- Captions from invidious companion
+ 
+ Notes:
+ - Requires a WORKING invidious instance.
+diff --git a/api/proxy.js b/api/proxy.js
+index 6d0fd4e..d827b0a 100644
+--- a/api/proxy.js
++++ b/api/proxy.js
+@@ -3,7 +3,10 @@ const {getUser} = require("../utils/getuser")
+ const constants = require("../utils/constants.js")
+ 
+ // list of paths relative to the backend this route is authorized to serve
+-const authorizedPaths = [`/api/v1/captions/(${constants.regex.video_id})`]
++const authorizedPaths = [
++	`/api/v1/captions/(${constants.regex.video_id})`,
++	`/companion/api/v1/captions/(${constants.regex.video_id})`
++]
+ 
+ // headers relayed as-is from the proxied backend to the client
+ const proxiedHeaders = ["content-type", "date", "last-modified", "expires", "cache-control", "accept-ranges", "content-range", "origin", "etag", "content-length", "transfer-encoding"]
+diff --git a/api/video.js b/api/video.js
+index f480b23..61bb3fd 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -236,6 +236,63 @@ module.exports = [
+ 			}
+ 		}
+ 	},
++	{
++		route: "/api/captions/vtt", methods: ["GET"], code: async ({req, url}) => {
++			const user = getUser(req);
++			const settings = user.getSettingsOrDefaults();
++			const videoId = url.searchParams.get("v");
++			const label = url.searchParams.get("label");
++
++			if (!videoId || !label) {
++				return {
++					statusCode: 400,
++					contentType: "text/plain",
++					content: "Missing v or label"
++				};
++			}
++
++			const instanceOrigin = settings.local === 1 ? "http://localhost:3000" : settings.instance;
++
++			try {
++				const watchRes = await fetch(`${instanceOrigin}/watch?v=${videoId}`);
++				if (!watchRes.ok) throw new Error("Failed to fetch watch page");
++				const watchHtml = await watchRes.text();
++
++				const trackRegex = /<track\s[^>]*kind="captions"[^>]*>/gi;
++				let companionUrl = null;
++				let match;
++				while ((match = trackRegex.exec(watchHtml)) !== null) {
++					const srcMatch = match[0].match(/src="([^"]+)"/);
++					const labelMatch = match[0].match(/label="([^"]+)"/);
++					if (srcMatch && labelMatch && labelMatch[1] === label) {
++						companionUrl = srcMatch[1];
++						break;
++					}
++				}
++
++				if (!companionUrl) throw new Error("No matching caption found");
++
++				const captionRes = await fetch(companionUrl);
++				const vtt = await captionRes.text();
++
++				return {
++					statusCode: 200,
++					contentType: "text/vtt; charset=UTF-8",
++					content: vtt,
++					headers: {
++						"Access-Control-Allow-Origin": "*",
++						"Cache-Control": "public, max-age=86400"
++					}
++				};
++			} catch (error) {
++				return {
++					statusCode: 500,
++					contentType: "text/plain",
++					content: "Failed to load captions"
++				};
++			}
++		}
++	},
+ 	{
+ 		route: "/api/comments", methods: ["GET"], code: async ({req, url}) => {
+ 			const user = getUser(req);
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 0c51ad6..d65ae9e 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -1152,4 +1152,5 @@ document.addEventListener('seekToTimestamp', async (event) => {
+     const { time, link } = eventData;
+     const href = link instanceof HTMLAnchorElement ? link.href : null;
+     await seekToTimestamp(time, href);
+-});
+\ No newline at end of file
++});
++
+diff --git a/pug/video.pug b/pug/video.pug
+index 54e7456..21f3ef6 100644
+--- a/pug/video.pug
++++ b/pug/video.pug
+@@ -34,7 +34,7 @@ block content
+             video(controls preload="auto" width=format.second__width height=format.second__height data-itag=format.itag autoplay=continuous||autoplay)#video.video
+               source(src=format.url type=format.type)
+               each t in video.captions
+-                track(label=t.label kind="subtitles" srclang=t.languageCode src=t.url)
++                track(label=t.label kind="subtitles" srclang=t.language_code src=`/api/captions/vtt?v=${video.videoId}&label=${encodeURIComponent(t.label)}`)
+               // fallback: flash player
+               - let flashvars = new URLSearchParams({skin: "/static/flash/skin.swf", video: format.url})
+               embed(type="application/x-shockwave-flash" src="/static/flash/player.swf" id="f4Player" width=1280 height=720 flashvars=flashvars.toString() allowscriptaccess="always" allowfullscreen="true" bgcolor="#000000")
+-- 
+2.55.0
+
