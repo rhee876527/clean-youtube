@@ -478,7 +478,10 @@ function startSyncCheck() {
             const minBufferLead = 2.0;
 
             if (bufferLead >= minBufferLead) {
+                const wasMuted = audioElement.muted;
+                audioElement.muted = true;
                 audioElement.currentTime = videoTime;
+                requestAnimationFrame(() => { audioElement.muted = wasMuted; });
             }
         }
     }, syncInterval);
