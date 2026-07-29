@@ -212,7 +212,7 @@ module.exports = [
 			const comments = (commentsData.comments || []).map(c => ({
 				...c,
 				contentHtml: converters.wrapTimestamps(
-					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
+					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(converters.fixBrokenProtocolPrefixes(c.contentHtml))),
 					id
 				)
 			}));
@@ -318,7 +318,7 @@ module.exports = [
 				data.comments = data.comments.map(c => ({
 					...c,
 					contentHtml: converters.wrapTimestamps(
-						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
+						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(converters.fixBrokenProtocolPrefixes(c.contentHtml))),
 						videoId
 					)
 				}));
