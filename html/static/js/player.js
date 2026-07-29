@@ -801,6 +801,7 @@ if (isChrome) {
                 savedPlaybackRate = videoElement.playbackRate;
                 videoElement.playbackRate = 0.0625;
                 audioElement.playbackRate = 0.0625;
+                audioElement.muted = true
                 videoElement.pause();
                 startResumeMonitor();
             }
@@ -826,6 +827,7 @@ if (isChrome) {
 
                 videoElement.playbackRate = savedPlaybackRate;
                 audioElement.playbackRate = savedPlaybackRate;
+                audioElement.muted = false
                 videoElement.play().catch(() => {});
                 audioElement.play().catch(() => {});
 
