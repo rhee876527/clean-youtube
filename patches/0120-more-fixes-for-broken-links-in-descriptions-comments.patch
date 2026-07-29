@@ -1,0 +1,105 @@
+From aa44ec980ef6697212ad75a1a9dccd5bcb516d91 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Wed, 29 Jul 2026 13:47:05 +0300
+Subject: [PATCH] more fixes for broken links in descriptions/comments
+
+---
+ api/video.js        |  4 ++--
+ utils/converters.js | 31 +++++++++++++++++++++++++++++--
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/api/video.js b/api/video.js
+index 61bb3fd..28774bd 100644
+--- a/api/video.js
++++ b/api/video.js
+@@ -212,7 +212,7 @@ module.exports = [
+ 			const comments = (commentsData.comments || []).map(c => ({
+ 				...c,
+ 				contentHtml: converters.wrapTimestamps(
+-					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
++					converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(converters.fixBrokenProtocolPrefixes(c.contentHtml))),
+ 					id
+ 				)
+ 			}));
+@@ -318,7 +318,7 @@ module.exports = [
+ 				data.comments = data.comments.map(c => ({
+ 					...c,
+ 					contentHtml: converters.wrapTimestamps(
+-						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(c.contentHtml)),
++						converters.fixBrokenYoutubeLinks(converters.stripInvidiousChapterLinks(converters.fixBrokenProtocolPrefixes(c.contentHtml))),
+ 						videoId
+ 					)
+ 				}));
+diff --git a/utils/converters.js b/utils/converters.js
+index 0ef14f4..b33cee0 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -70,6 +70,30 @@ function stripInvidiousChapterLinks(html) {
+ 	return html.replace(/<a[^>]*data-jump-time="[^"]*"[^>]*>([^<]*)<\/a>/g, "$1")
+ }
+ 
++/**
++ * Fix broken URL protocol prefixes that Invidious leaves outside <a> tags.
++ * Invidious converts URLs in descriptions to anchor tags but often leaves
++ * the protocol prefix (http, http:/, http://, etc.) outside the tag.
++ * e.g. http<a href="http://example.com">example.com</a> -> <a href="http://example.com">http://example.com</a>
++ *      http://<a href="http://cash.app">cash.app</a> -> <a href="http://cash.app">http://cash.app</a>
++ *      http://sh<a href="http://shop.example.com">shop.example.com</a> -> <a href="http://shop.example.com">http://shop.example.com</a>
++ *      http://y<a href="/path">youtube.com/path</a> -> <a href="https://www.youtube.com/path">https://www.youtube.com/path</a>
++ */
++function fixBrokenProtocolPrefixes(html) {
++	return html.replace(/(https?)([^<]*?)(<a\b[^>]*>)([^<]*)(<\/a>)/gi, (match, protocol, middle, openTag, text, closeTag) => {
++		const hrefMatch = openTag.match(/href="([^"]+)"/)
++		const href = hrefMatch ? hrefMatch[1] : ''
++		if (href === '/') return match
++		if (href.startsWith('/')) {
++			return `<a href="https://www.youtube.com${href}">https://www.youtube.com${href}</a>`
++		}
++		if (href.startsWith('http://') || href.startsWith('https://')) {
++			return openTag + href + closeTag
++		}
++		return match
++	})
++}
++
+ /**
+  * Fix broken YouTube links that Invidious incorrectly converts to relative paths.
+  * Invidious turns <a href="https://www.youtube.com/whatever/join"> into
+@@ -77,7 +101,7 @@ function stripInvidiousChapterLinks(html) {
+  * Skip /watch?v= and /channel/ links which should stay local.
+  */
+ function fixBrokenYoutubeLinks(html) {
+-	return html.replace(/<a href="\/(?!(?:watch\?|channel\/))([^"]+)">youtube\.com\/([^<]+)<\/a>/g, (_, path, text) => {
++	return html.replace(/<a href="\/(?!(?:watch\?|channel\/))([^"]+)">(?:youtube\.com\/|https?:\/\/www\.youtube\.com\/)([^<]+)<\/a>/g, (_, path, text) => {
+ 		return `<a href="https://www.youtube.com/${path}">youtube.com/${text}</a>`
+ 	})
+ }
+@@ -127,6 +151,7 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 	// https://www.youtube.com/watch?v=LSG71wbKpbQ www.youtube.com/channel/<id>
+ 	// https://www.youtube.com/watch?v=RiEkOKFOG3s youtu.be/<videoid> with params
+ 
++	descriptionHtml = fixBrokenProtocolPrefixes(descriptionHtml)
+ 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu\\.be/(${constants.regex.video_id})[?]?([^"]*)">([^<]+)</a>`, "g"), (_, id, params, innerText) => {
+ 		if (params) {
+ 			return `<a href="/watch?v=${id}&${params}">${innerText}</a>`
+@@ -134,7 +159,8 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 			return `<a href="/watch?v=${id}">${innerText}</a>`
+ 		}
+ 	})
+-	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu(?:\\.be|be\\.com)/([^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
++	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtube\\.com/(watch\\?v=${constants.regex.video_id}(?:[^"]*)?|channel/[^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
++	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu\\.be/([^"]*)">([^<]+)<\/a>`, "g"), `<a href="/watch?v=$1">$2</a>`)
+ 	// Strip Invidious pre-built chapter links (they have wrong timestamps and fragment text)
+ 	descriptionHtml = stripInvidiousChapterLinks(descriptionHtml)
+ 	// Fix broken YouTube links (youtube.com/path as relative links)
+@@ -241,6 +267,7 @@ module.exports.rewriteVideoDescription = rewriteVideoDescription
+ module.exports.wrapTimestamps = wrapTimestamps
+ module.exports.stripInvidiousChapterLinks = stripInvidiousChapterLinks
+ module.exports.fixBrokenYoutubeLinks = fixBrokenYoutubeLinks
++module.exports.fixBrokenProtocolPrefixes = fixBrokenProtocolPrefixes
+ module.exports.tToMediaFragment = tToMediaFragment
+ module.exports.viewCountToText = viewCountToText
+ module.exports.subscriberCountToText = subscriberCountToText
+-- 
+2.55.0
+
