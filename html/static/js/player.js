@@ -894,19 +894,31 @@ if (isFirefox) {
     }, 250); // check every 250ms
 }
 
+const observedTargets = new Set();
+
 const videoObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+    const expected = [videoElement];
+    if (formatLoader.npa) expected.push(audioElement);
+
+    for (const entry of entries) {
         if (entry.isIntersecting) {
-            loadMediaWithRetry(videoElement, formatLoader.npv.url);
-            if (formatLoader.npa) {
-                loadMediaWithRetry(audioElement, formatLoader.npa.url);
-            }
-            videoObserver.disconnect();
+            observedTargets.add(entry.target);
         }
-    });
+    }
+
+    if (expected.every(el => observedTargets.has(el))) {
+        loadMediaWithRetry(videoElement, formatLoader.npv.url);
+        if (formatLoader.npa) {
+            loadMediaWithRetry(audioElement, formatLoader.npa.url);
+        }
+        videoObserver.disconnect();
+    }
 }, { threshold: 0.5 });
 
 videoObserver.observe(videoElement);
+if (formatLoader.npa) {
+    videoObserver.observe(audioElement);
+}
 
 function relativeSeek(seconds) {
     const t = videoElement.currentTime + seconds;
