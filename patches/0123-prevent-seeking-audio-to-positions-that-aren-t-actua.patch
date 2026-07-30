@@ -1,0 +1,101 @@
+From c6927d7d3ae04273db68d8ebe7d2966310ad267e Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Thu, 30 Jul 2026 13:11:32 +0300
+Subject: [PATCH] prevent seeking audio to positions that aren't actually
+ buffered
+
+---
+ html/static/js/player.js | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index f925a06..a3c094f 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -470,10 +470,11 @@ function startSyncCheck() {
+ 
+         if (Math.abs(drift) > driftThreshold && videoElement.playbackRate <= 1) {
+             // Check if audio buffer is sufficient before correcting
+-            const audioEnd = audioElement.buffered.length
+-                ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            const ranges = audioElement.buffered;
++            const last = ranges.length - 1;
++            const bufferLead = last >= 0 && videoTime >= ranges.start(last) - 0.05 && videoTime <= ranges.end(last)
++                ? ranges.end(last) - videoTime
+                 : 0;
+-            const bufferLead = audioEnd - videoTime;
+ 
+             const minBufferLead = 2.0;
+ 
+@@ -716,11 +717,13 @@ videoElement.addEventListener("seeking", async () => {
+ function resumeWhenBuffered() {
+     if (!freezePlayback || !shouldResume) return;
+ 
+-    const audioEnd = audioElement.buffered.length
+-        ? audioElement.buffered.end(audioElement.buffered.length - 1)
++    const ranges = audioElement.buffered;
++    const last = ranges.length - 1;
++    const bufferLead = last >= 0 && videoElement.currentTime >= ranges.start(last) - 0.05 && videoElement.currentTime <= ranges.end(last)
++        ? ranges.end(last) - videoElement.currentTime
+         : 0;
+ 
+-    if (audioEnd - videoElement.currentTime >= 3) {
++    if (bufferLead >= 3) {
+         freezePlayback = false;
+         shouldResume = false;
+ 
+@@ -790,12 +793,12 @@ if (isChrome) {
+         const audioTime = audioElement.currentTime;
+         const drift = videoTime - audioTime;
+ 
+-        const audioEnd = audioElement.buffered.length
+-            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++        const ranges = audioElement.buffered;
++        const last = ranges.length - 1;
++        const bufferLead = last >= 0 && videoTime >= ranges.start(last) - 0.05 && videoTime <= ranges.end(last)
++            ? ranges.end(last) - videoTime
+             : 0;
+ 
+-        const bufferLead = audioEnd - videoTime;
+-
+         if (!driftLocked && Math.abs(drift) > chromedriftThreshold && videoElement.playbackRate <= 1) {
+             if (bufferLead >= minBufferLead) {
+                 audioElement.currentTime = videoTime;
+@@ -820,10 +823,11 @@ if (isChrome) {
+         const checkInterval = 250;
+ 
+         const check = () => {
+-            const audioEnd = audioElement.buffered.length
+-                ? audioElement.buffered.end(audioElement.buffered.length - 1)
++            const ranges = audioElement.buffered;
++            const last = ranges.length - 1;
++            const bufferLead = last >= 0 && videoElement.currentTime >= ranges.start(last) - 0.05 && videoElement.currentTime <= ranges.end(last)
++                ? ranges.end(last) - videoElement.currentTime
+                 : 0;
+-            const bufferLead = audioEnd - videoElement.currentTime;
+ 
+             if (bufferLead >= minBufferLead + 1.0) {
+                 audioElement.currentTime = videoElement.currentTime;
+@@ -865,13 +869,16 @@ if (isFirefox) {
+         if (now - lastFirefoxCorrection < firefoxCorrectionCooldown) return;
+ 
+         const drift = videoElement.currentTime - audioElement.currentTime;
+-        const audioEnd = audioElement.buffered.length
+-            ? audioElement.buffered.end(audioElement.buffered.length - 1)
++
++        const ranges = audioElement.buffered;
++        const last = ranges.length - 1;
++        const bufferLead = last >= 0 && videoElement.currentTime >= ranges.start(last) - 0.05 && videoElement.currentTime <= ranges.end(last)
++            ? ranges.end(last) - videoElement.currentTime
+             : 0;
+ 
+         if (
+             audioElement.readyState >= 3 &&
+-            (audioEnd - videoElement.currentTime) >= minBufferLead &&
++            bufferLead >= minBufferLead &&
+             Math.abs(drift) > firefoxDriftThreshold
+         ) {
+             if (Math.abs(drift) > firefoxMaxJump) {
+-- 
+2.55.0
+
