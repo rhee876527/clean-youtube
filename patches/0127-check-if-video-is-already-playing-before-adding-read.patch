@@ -1,0 +1,26 @@
+From a853c144c318c1431aadddd88cc3065360bcaefc Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 16 Aug 2026 00:23:21 +0300
+Subject: [PATCH] check if video is already playing before adding readiness
+ guard
+
+---
+ html/static/js/player.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index 1ffd318..bce5e10 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -1042,7 +1042,7 @@ document.addEventListener("keydown", async (event) => {
+         isPlaybackActionPending = true;
+ 
+         // Check if both elements are ready before attempting playback
+-        if (!data.continuous && (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2))) {
++        if (videoElement.paused && !data.continuous && (videoElement.readyState < 2 || (formatLoader.npa && audioElement.readyState < 2))) {
+             console.log("Media not ready, skipping playback attempt");
+             isPlaybackActionPending = false;
+             return; // prevent further handling but don't play
+-- 
+2.55.0
+

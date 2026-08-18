@@ -1,0 +1,122 @@
+From b0805420c19c7c8a4392f8aa28ede64a1bf9d36b Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 16 Aug 2026 11:02:42 +0300
+Subject: [PATCH] add awareness of ongoing drift lock to seek
+
+use seek as an escape hatch when automatic drift lock gets inconvenient
+---
+ html/static/js/player.js | 34 +++++++++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 3 deletions(-)
+
+diff --git a/html/static/js/player.js b/html/static/js/player.js
+index bce5e10..957d9bf 100644
+--- a/html/static/js/player.js
++++ b/html/static/js/player.js
+@@ -769,6 +769,8 @@ videoElement.addEventListener("seeking", () => {
+ const isChrome = typeof navigator !== "undefined" && /chrome|chromium/i.test(navigator.userAgent);
+ const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
+ 
++let resetDriftLock = () => {};
++
+ const chromedriftThreshold = 0.15;        // Chrome threshold
+ const firefoxDriftThreshold = 0.3;  // Firefox threshold
+ const minBufferLead = 2.0;
+@@ -782,6 +784,8 @@ if (isChrome) {
+     let driftLocked = false;
+     let resumeCheckRunning = false;
+     let savedPlaybackRate = 1.0;
++    let savedMuted = false;
++    let resumeCheckTimeout = null;
+ 
+     function monitorDrift(now, metadata) {
+         if (!formatLoader.npa || freezePlayback) {
+@@ -795,6 +799,7 @@ if (isChrome) {
+ 
+         const ranges = audioElement.buffered;
+         const last = ranges.length - 1;
++
+         const bufferLead = last >= 0 && videoTime >= ranges.start(last) - 0.05 && videoTime <= ranges.end(last)
+             ? ranges.end(last) - videoTime
+             : 0;
+@@ -805,9 +810,12 @@ if (isChrome) {
+             } else {
+                 driftLocked = true;
+                 savedPlaybackRate = videoElement.playbackRate;
++                savedMuted = audioElement.muted;
++
+                 videoElement.playbackRate = 0.0625;
+                 audioElement.playbackRate = 0.0625;
+-                audioElement.muted = true
++                audioElement.muted = true;
++
+                 videoElement.pause();
+                 startResumeMonitor();
+             }
+@@ -818,6 +826,7 @@ if (isChrome) {
+ 
+     function startResumeMonitor() {
+         if (resumeCheckRunning) return;
++
+         resumeCheckRunning = true;
+ 
+         const checkInterval = 250;
+@@ -825,6 +834,7 @@ if (isChrome) {
+         const check = () => {
+             const ranges = audioElement.buffered;
+             const last = ranges.length - 1;
++
+             const bufferLead = last >= 0 && videoElement.currentTime >= ranges.start(last) - 0.05 && videoElement.currentTime <= ranges.end(last)
+                 ? ranges.end(last) - videoElement.currentTime
+                 : 0;
+@@ -834,21 +844,38 @@ if (isChrome) {
+ 
+                 videoElement.playbackRate = savedPlaybackRate;
+                 audioElement.playbackRate = savedPlaybackRate;
+-                audioElement.muted = false
++                audioElement.muted = savedMuted;
++
+                 videoElement.play().catch(() => {});
+                 audioElement.play().catch(() => {});
+ 
+                 driftLocked = false;
+                 resumeCheckRunning = false;
++                resumeCheckTimeout = null;
++
+                 return;
+             }
+ 
+-            setTimeout(check, bufferLead < 1.0 ? 500 : checkInterval);
++            resumeCheckTimeout = setTimeout(check, bufferLead < 1.0 ? 500 : checkInterval);
+         };
+ 
+         check();
+     }
+ 
++    resetDriftLock = () => {
++        driftLocked = false;
++        resumeCheckRunning = false;
++
++        if (resumeCheckTimeout) {
++            clearTimeout(resumeCheckTimeout);
++            resumeCheckTimeout = null;
++        }
++
++        videoElement.playbackRate = savedPlaybackRate;
++        audioElement.playbackRate = savedPlaybackRate;
++        audioElement.muted = savedMuted;
++    };
++
+     videoElement.requestVideoFrameCallback(monitorDrift);
+ }
+ 
+@@ -993,6 +1020,7 @@ videoElement.addEventListener("click", (event) => {
+ });
+ 
+ videoElement.addEventListener("seeking", () => {
++    resetDriftLock();
+     // Cancel any pending play operations
+     if (playAbortController) {
+         playAbortController.abort();
+-- 
+2.55.0
+
