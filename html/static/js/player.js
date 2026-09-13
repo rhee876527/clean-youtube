@@ -922,29 +922,38 @@ if (isFirefox) {
 }
 
 const observedTargets = new Set();
+let playbackStarted = false;
 
-const videoObserver = new IntersectionObserver((entries) => {
+function maybeStartPlayback() {
+    if (playbackStarted) return;
     const expected = [videoElement];
     if (formatLoader.npa) expected.push(audioElement);
+    if (!expected.every(el => observedTargets.has(el))) return;
+    playbackStarted = true;
+    videoObserver.disconnect();
+    loadMediaWithRetry(videoElement, formatLoader.npv.url);
+    if (formatLoader.npa) {
+        loadMediaWithRetry(audioElement, formatLoader.npa.url);
+    }
+}
 
+const videoObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (entry.isIntersecting) {
             observedTargets.add(entry.target);
         }
     }
-
-    if (expected.every(el => observedTargets.has(el))) {
-        loadMediaWithRetry(videoElement, formatLoader.npv.url);
-        if (formatLoader.npa) {
-            loadMediaWithRetry(audioElement, formatLoader.npa.url);
-        }
-        videoObserver.disconnect();
-    }
+    maybeStartPlayback();
 }, { threshold: 0.5 });
 
 videoObserver.observe(videoElement);
 if (formatLoader.npa) {
-    videoObserver.observe(audioElement);
+    // #audio has no controls and no visual presence, so viewport
+    // intersection can never gate it. Each stream is gated on its own
+    // meaningful condition: video on visibility (above), audio on
+    // presence here.
+    if (audioElement.isConnected) observedTargets.add(audioElement);
+    maybeStartPlayback();
 }
 
 function relativeSeek(seconds) {
