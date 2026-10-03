@@ -52,5 +52,5 @@ index a3c094f..1ffd318 100644
  function relativeSeek(seconds) {
      const t = videoElement.currentTime + seconds;
 -- 
-2.55.0
+2.56.0
 

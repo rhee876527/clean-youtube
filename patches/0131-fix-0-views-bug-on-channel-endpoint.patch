@@ -1,0 +1,215 @@
+From 7740c1223e6cdbaa87e952519dd97e2be12eda89 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sat, 3 Oct 2026 12:31:30 +0300
+Subject: [PATCH] fix 0 views bug on /channel endpoint
+
+issue presents on collab videos. fix adds additional query against /search
+---
+ background/feed-update.js |  15 +++--
+ utils/collab-views.js     | 118 ++++++++++++++++++++++++++++++++++++++
+ utils/youtube.js          |   6 ++
+ 3 files changed, 135 insertions(+), 4 deletions(-)
+ create mode 100644 utils/collab-views.js
+
+diff --git a/background/feed-update.js b/background/feed-update.js
+index 62f0d5a..e87bb06 100644
+--- a/background/feed-update.js
++++ b/background/feed-update.js
+@@ -4,6 +4,7 @@ const Denque = require("denque")
+ const fetch = require("node-fetch")
+ const constants = require("../utils/constants")
+ const db = require("../utils/db")
++const {enrichSuspectVideos, isSuspect} = require("../utils/collab-views")
+ 
+ const prepared = {
+ 	video_insert: db.prepare(
+@@ -12,9 +13,9 @@ const prepared = {
+ 			+ " VALUES"
+ 			+ " (@videoId, @title, @author, @authorId, @published, @viewCountText, @descriptionHtml)"
+ 			+ " ON CONFLICT(videoId) DO UPDATE SET"
+-			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL THEN excluded.viewCountText ELSE viewCountText END,"
++			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL AND excluded.viewCountText != '0 views' THEN excluded.viewCountText ELSE viewCountText END,"
+ 			+ " descriptionHtml = CASE WHEN excluded.descriptionHtml IS NOT NULL THEN excluded.descriptionHtml ELSE descriptionHtml END,"
+-			+ " published = CASE WHEN published IS NULL THEN excluded.published ELSE published END"
++			+ " published = CASE WHEN excluded.published IS NOT NULL AND (published IS NULL OR excluded.published < published) THEN excluded.published ELSE published END"
+ 	),
+ 	channel_refreshed_update: db.prepare(
+ 		"UPDATE Channels SET refreshed = ? WHERE ucid = ?"
+@@ -81,19 +82,25 @@ class Refresher {
+ 	}
+ 
+ 	refreshChannel(ucid) {
+-		return fetch(`${constants.server_setup.local_instance_origin}/api/v1/channels/${ucid}/latest`).then(res => res.json()).then(/** @param {any} root */ root => {
++		return fetch(`${constants.server_setup.local_instance_origin}/api/v1/channels/${ucid}/latest`).then(res => res.json()).then(/** @param {any} root */ async root => {
+ 			// Handle both old API format (array at root) and new format ({videos: [...]})
+ 			const videos = Array.isArray(root) ? root : (root.videos || [])
+ 			if (videos.length > 0) {
++				// Patch Invidious collab 0-views via search (views + date, 12h cache, fail-open).
++				await enrichSuspectVideos(videos, constants.server_setup.local_instance_origin)
+ 				videos.forEach(video => {
+ 					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
+ 					if (!video.videoId && !video.playlistId) return
++					// If enrichment failed, the video still carries the bogus
++					// now-timestamp: store NULL so the upsert keeps any
++					// previously stored true date instead of poisoning it.
++					const stillBogus = isSuspect(video)
+ 					const row = {
+ 						videoId: video.videoId ?? video.playlistId,
+ 						title: video.title,
+ 						author: video.author,
+ 						authorId: video.authorId,
+-						published: video.published ?? null,
++						published: stillBogus ? null : (video.published ?? null),
+ 						viewCountText: video.viewCountText ?? null,
+ 						descriptionHtml: video.descriptionHtml?.replace(/<a /g, '<a tabindex="-1" ') ?? ''
+ 					}
+diff --git a/utils/collab-views.js b/utils/collab-views.js
+new file mode 100644
+index 0000000..00387a3
+--- /dev/null
++++ b/utils/collab-views.js
+@@ -0,0 +1,118 @@
++const {request} = require("./request")
++
++// Cache for search-based collab-bug enrichments (views + publish date).
++// 12h TTL per user request.
++const CACHE_TTL_MS = 12 * 60 * 60 * 1000
++const cache = new Map() // videoId -> {viewCount, viewCountText, published, publishedText, ts}
++
++function cacheGet(videoId) {
++	const entry = cache.get(videoId)
++	if (!entry) return null
++	if (Date.now() - entry.ts > CACHE_TTL_MS) {
++		cache.delete(videoId)
++		return null
++	}
++	return entry
++}
++
++function cacheSet(videoId, viewCount, viewCountText, published, publishedText) {
++	cache.set(videoId, {viewCount, viewCountText, published, publishedText, ts: Date.now()})
++}
++
++function cacheClear() {
++	cache.clear()
++}
++
++/**
++ * Invidious channel endpoints zero out views for collab videos
++ * (author "A and B", authorId "") while search parses them correctly.
++ * Genuine live/upcoming videos also report 0 views and must be left alone.
++ */
++function isSuspect(video) {
++	if (!video || typeof video !== "object") return false
++	if (video.viewCount !== 0) return false
++	if (video.liveNow === true) return false
++	if (video.isUpcoming === true) return false
++	const prem = video.premiereTimestamp
++	if (prem !== undefined && prem !== null && prem !== 0) return false
++	if (typeof video.lengthSeconds === "number" && video.lengthSeconds <= 0) return false
++	return true
++}
++
++function fetchWithTimeout(url, timeoutMs) {
++	return Promise.race([
++		request(url).then(res => res.json()),
++		new Promise((_, reject) => setTimeout(() => reject(new Error("collab-views timeout")), timeoutMs))
++	])
++}
++
++async function enrichOne(video, instance, timeoutMs) {
++	const videoId = video.videoId ?? video.playlistId
++	if (!videoId) return false
++	const cached = cacheGet(videoId)
++	if (cached) {
++		// views + publish-date patch from cache (author etc. untouched)
++		video.viewCount = cached.viewCount
++		video.viewCountText = cached.viewCountText
++		if (cached.published !== undefined && cached.published !== null) {
++			video.published = cached.published
++			video.publishedText = cached.publishedText
++		}
++		delete video.second__viewCountText
++		return true
++	}
++	const url = `${instance}/api/v1/search?q=${encodeURIComponent(videoId)}&type=video&hl=en`
++	const data = await fetchWithTimeout(url, timeoutMs)
++	if (!Array.isArray(data)) return false
++	const match = data.find(v => v && v.videoId === videoId)
++	if (!match || typeof match.viewCount !== "number") return false
++	// Only apply when search actually has real (non-zero) views.
++	// A genuine just-published 0-view video stays 0 without extra writes.
++	if (match.viewCount === 0) return false
++	cacheSet(videoId, match.viewCount, match.viewCountText ?? null, match.published ?? null, match.publishedText ?? null)
++	// Views + publish-date patch: do not touch author or any other field.
++	// Fixing the date matters because normaliseVideoInfo renders a leftover
++	// "0 seconds ago" as "Live now".
++	video.viewCount = match.viewCount
++	video.viewCountText = match.viewCountText ?? video.viewCountText
++	if (match.published !== undefined && match.published !== null) {
++		video.published = match.published
++		video.publishedText = match.publishedText ?? video.publishedText
++	}
++	delete video.second__viewCountText
++	return true
++}
++
++/**
++ * Patch collab-bug 0-views entries in-place via search API (views + publish date).
++ * Fail-open: any error leaves the original video untouched.
++ */
++async function enrichSuspectVideos(videos, instance, options = {}) {
++	if (!Array.isArray(videos) || videos.length === 0) return {patched: 0, skipped: 0}
++	if (!instance) return {patched: 0, skipped: videos.length}
++	const {
++		concurrency = 3,
++		timeoutMs = 8000
++	} = options
++	const suspects = videos.filter(isSuspect)
++	let patched = 0
++	for (let i = 0; i < suspects.length; i += concurrency) {
++		const batch = suspects.slice(i, i + concurrency)
++		const results = await Promise.allSettled(
++			batch.map(video => enrichOne(video, instance, timeoutMs).then(ok => ({video, ok})))
++		)
++		for (const r of results) {
++			if (r.status === "fulfilled" && r.value.ok) {
++				patched++
++				const v = r.value.video
++				console.log(`collab-views patched videoId=${v.videoId ?? v.playlistId} views=${v.viewCount} text=${v.viewCountText}`)
++			}
++		}
++	}
++	return {patched, skipped: videos.length - patched}
++}
++
++module.exports.isSuspect = isSuspect
++module.exports.enrichSuspectVideos = enrichSuspectVideos
++module.exports.cacheClear = cacheClear
++module.exports.CACHE_TTL_MS = CACHE_TTL_MS
+diff --git a/utils/youtube.js b/utils/youtube.js
+index 8742f9e..dad370b 100644
+--- a/utils/youtube.js
++++ b/utils/youtube.js
+@@ -1,5 +1,6 @@
+ const {request} = require("./request")
+ const db = require("./db")
++const {enrichSuspectVideos} = require("./collab-views")
+ 
+ async function fetchChannel(path, ucid, instance) {
+ 	function updateGoodData(channel) {
+@@ -45,6 +46,11 @@ async function fetchChannel(path, ucid, instance) {
+ 
+ 	// handle the case where the just-fetched channel does not have an error
+ 	updateGoodData(channel)
++	// Invidious zeroes views for collab videos on channel endpoints.
++	// Patch views-only via search; fail-open, cached 12h.
++	if (Array.isArray(channel.latestVideos)) {
++		await enrichSuspectVideos(channel.latestVideos, instance)
++	}
+ 	return channel
+ }
+ 
+-- 
+2.56.0
+

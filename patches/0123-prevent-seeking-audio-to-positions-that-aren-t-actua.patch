@@ -97,5 +97,5 @@ index f925a06..a3c094f 100644
          ) {
              if (Math.abs(drift) > firefoxMaxJump) {
 -- 
-2.55.0
+2.56.0
 
