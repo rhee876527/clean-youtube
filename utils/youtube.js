@@ -1,5 +1,6 @@
 const {request} = require("./request")
 const db = require("./db")
+const {enrichSuspectVideos} = require("./collab-views")
 
 async function fetchChannel(path, ucid, instance) {
 	function updateGoodData(channel) {
@@ -45,6 +46,11 @@ async function fetchChannel(path, ucid, instance) {
 
 	// handle the case where the just-fetched channel does not have an error
 	updateGoodData(channel)
+	// Invidious zeroes views for collab videos on channel endpoints.
+	// Patch views-only via search; fail-open, cached 12h.
+	if (Array.isArray(channel.latestVideos)) {
+		await enrichSuspectVideos(channel.latestVideos, instance)
+	}
 	return channel
 }
 

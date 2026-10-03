@@ -4,6 +4,7 @@ const Denque = require("denque")
 const fetch = require("node-fetch")
 const constants = require("../utils/constants")
 const db = require("../utils/db")
+const {enrichSuspectVideos, isSuspect} = require("../utils/collab-views")
 
 const prepared = {
 	video_insert: db.prepare(
@@ -12,9 +13,9 @@ const prepared = {
 			+ " VALUES"
 			+ " (@videoId, @title, @author, @authorId, @published, @viewCountText, @descriptionHtml)"
 			+ " ON CONFLICT(videoId) DO UPDATE SET"
-			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL THEN excluded.viewCountText ELSE viewCountText END,"
+			+ " viewCountText = CASE WHEN excluded.viewCountText IS NOT NULL AND excluded.viewCountText != '0 views' THEN excluded.viewCountText ELSE viewCountText END,"
 			+ " descriptionHtml = CASE WHEN excluded.descriptionHtml IS NOT NULL THEN excluded.descriptionHtml ELSE descriptionHtml END,"
-			+ " published = CASE WHEN published IS NULL THEN excluded.published ELSE published END"
+			+ " published = CASE WHEN excluded.published IS NOT NULL AND (published IS NULL OR excluded.published < published) THEN excluded.published ELSE published END"
 	),
 	channel_refreshed_update: db.prepare(
 		"UPDATE Channels SET refreshed = ? WHERE ucid = ?"
@@ -81,19 +82,25 @@ class Refresher {
 	}
 
 	refreshChannel(ucid) {
-		return fetch(`${constants.server_setup.local_instance_origin}/api/v1/channels/${ucid}/latest`).then(res => res.json()).then(/** @param {any} root */ root => {
+		return fetch(`${constants.server_setup.local_instance_origin}/api/v1/channels/${ucid}/latest`).then(res => res.json()).then(/** @param {any} root */ async root => {
 			// Handle both old API format (array at root) and new format ({videos: [...]})
 			const videos = Array.isArray(root) ? root : (root.videos || [])
 			if (videos.length > 0) {
+				// Patch Invidious collab 0-views via search (views + date, 12h cache, fail-open).
+				await enrichSuspectVideos(videos, constants.server_setup.local_instance_origin)
 				videos.forEach(video => {
 					// organise - YouTube broke the API so latest returns playlist items where playlistId = videoId
 					if (!video.videoId && !video.playlistId) return
+					// If enrichment failed, the video still carries the bogus
+					// now-timestamp: store NULL so the upsert keeps any
+					// previously stored true date instead of poisoning it.
+					const stillBogus = isSuspect(video)
 					const row = {
 						videoId: video.videoId ?? video.playlistId,
 						title: video.title,
 						author: video.author,
 						authorId: video.authorId,
-						published: video.published ?? null,
+						published: stillBogus ? null : (video.published ?? null),
 						viewCountText: video.viewCountText ?? null,
 						descriptionHtml: video.descriptionHtml?.replace(/<a /g, '<a tabindex="-1" ') ?? ''
 					}
