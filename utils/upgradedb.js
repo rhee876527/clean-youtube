@@ -95,6 +95,13 @@ const deltas = [
 			db.prepare("ALTER TABLE NEW_Subscriptions RENAME TO Subscriptions")
 				.run()
 		})()
+	},
+	// 13: +Handles (youtube @handle -> ucid cache, handles are case-insensitive so key is lowercased)
+	function() {
+		db.prepare("CREATE TABLE Handles (handle TEXT NOT NULL, ucid TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (handle))")
+			.run()
+		db.prepare("CREATE INDEX Handles_ucid ON Handles (ucid)")
+			.run()
 	}
 ]
 

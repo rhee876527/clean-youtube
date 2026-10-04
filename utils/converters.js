@@ -160,6 +160,8 @@ function rewriteVideoDescription(descriptionHtml, id) {
 		}
 	})
 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtube\\.com/(watch\\?v=${constants.regex.video_id}(?:[^"]*)?|channel/[^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
+	// Rewrite youtube.com/@handle links to local /@handle so they hit the handle resolver above.
+	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtube\\.com/(@[^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu\\.be/([^"]*)">([^<]+)<\/a>`, "g"), `<a href="/watch?v=$1">$2</a>`)
 	// Strip Invidious pre-built chapter links (they have wrong timestamps and fragment text)
 	descriptionHtml = stripInvidiousChapterLinks(descriptionHtml)

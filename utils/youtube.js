@@ -54,4 +54,57 @@ async function fetchChannel(path, ucid, instance) {
 	return channel
 }
 
+/**
+ * Resolve a YouTube @handle to a canonical UCID via Invidious
+ * `GET {instance}/api/v1/resolveurl?url=https://www.youtube.com/@handle`.
+ * Returns the UCID string, or null if it cannot be resolved.
+ * Fail-open: never throws for backend errors, just returns null.
+ */
+async function resolveHandleToUcid(handle, instance) {
+	if (!instance) throw new Error("No instance parameter provided")
+	const clean = String(handle || "").replace(/^@/, "").trim()
+	if (!clean) return null
+	const pageURL = `https://www.youtube.com/@${clean}`
+	const fetchURL = `${instance}/api/v1/resolveurl?url=${encodeURIComponent(pageURL)}`
+	let resolved
+	try {
+		resolved = await request(fetchURL).then(res => res.json())
+	} catch (e) {
+		return null
+	}
+	if (!resolved || resolved.error) return null
+	// Invidious returns {ucid, browseId, pageType}. Only accept channel pages.
+	if (resolved.pageType && resolved.pageType !== "WEB_PAGE_TYPE_CHANNEL") return null
+	const ucid = resolved.ucid || resolved.browseId || null
+	if (!ucid || !/^UC[A-Za-z0-9-_]{20,}$/.test(ucid)) return null
+	return ucid
+}
+
+/**
+ * Get the UCID for a handle, using the Handles table as a cache.
+ * Key is lowercased (YouTube handles are case-insensitive).
+ * On cache miss, resolves via the given instance and stores the mapping.
+ * Returns the UCID string, or null if unresolvable.
+ */
+async function getChannelIdForHandle(handle, instance) {
+	const clean = String(handle || "").replace(/^@/, "").trim()
+	if (!clean) return null
+	const key = clean.toLowerCase()
+	try {
+		const hit = db.prepare("SELECT ucid FROM Handles WHERE handle = ?").get(key)
+		if (hit && hit.ucid) return hit.ucid
+	} catch (e) {
+		// table may not exist yet if migration hasn't run; fall through to resolve
+	}
+	const ucid = await resolveHandleToUcid(clean, instance)
+	if (ucid) {
+		try {
+			db.prepare("REPLACE INTO Handles (handle, ucid, updated) VALUES (?, ?, ?)").run(key, ucid, Date.now())
+		} catch (e) {}
+	}
+	return ucid
+}
+
 module.exports.fetchChannel = fetchChannel
+module.exports.resolveHandleToUcid = resolveHandleToUcid
+module.exports.getChannelIdForHandle = getChannelIdForHandle
