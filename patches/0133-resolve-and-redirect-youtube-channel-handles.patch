@@ -1,0 +1,175 @@
+From 57cc3fcf935e20c187cda0727761f6b2cadea9de Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Sun, 4 Oct 2026 14:57:41 +0300
+Subject: [PATCH] resolve and redirect youtube @ channel handles
+
+---
+ api/channels.js     | 50 ++++++++++++++++++++++++++++++++++++++----
+ utils/converters.js |  2 ++
+ utils/upgradedb.js  |  7 ++++++
+ utils/youtube.js    | 53 +++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+), 4 deletions(-)
+
+diff --git a/api/channels.js b/api/channels.js
+index e230e8e..56f27f6 100644
+--- a/api/channels.js
++++ b/api/channels.js
+@@ -1,7 +1,8 @@
+-const {render} = require("pinski/plugins")
+-const {fetchChannel} = require("../utils/youtube")
++const {render, redirect} = require("pinski/plugins")
++const {fetchChannel, getChannelIdForHandle} = require("../utils/youtube")
+ const {getUser} = require("../utils/getuser")
+ const converters = require("../utils/converters")
++const constants = require("../utils/constants")
+ 
+ module.exports = [
+ 	{
+@@ -34,8 +35,49 @@ module.exports = [
+ 					video.watched = watchedVideos.includes(video.videoId)
+ 				})
+ 			}
+-			const subscribed = user.isSubscribed(data.authorId)
+-			return render(200, "pug/channel.pug", {req, settings, data, subscribed, instanceOrigin})
++		const subscribed = user.isSubscribed(data.authorId)
++		return render(200, "pug/channel.pug", {req, settings, data, subscribed, instanceOrigin})
++	}
++	},
++	{
++		// YouTube @handles: resolve once via the server instance, then
++		// 301 to the canonical /channel/UC... URL. Subscriptions and all
++		// downstream fetches stay UCID-only, so any user instance works.
++		route: `/@([^/]+)(?:/.*)?`, methods: ["GET"], code: async ({req, fill, url}) => {
++			const rawHandle = fill[0] || ""
++			const user = getUser(req)
++			const settings = user.getSettingsOrDefaults()
++			const instanceOrigin = settings.instance
++			// Try the user's own instance first (respects their Settings
++			// choice), then fall back to the server instance. Either can
++			// resolve; the DB cache makes the second lookup free on success.
++			const localOrigin = constants.server_setup.local_instance_origin
++			const candidates = [...new Set([instanceOrigin, localOrigin].filter(Boolean))]
++
++			let ucid = null
++			for (const candidate of candidates) {
++				try {
++					ucid = await getChannelIdForHandle(rawHandle, candidate)
++				} catch (e) {
++					ucid = null
++				}
++				if (ucid) break
++			}
++			if (!ucid) console.error(`Could not resolve handle @${rawHandle} via ${candidates.join(", ")}`)
++			if (ucid) {
++				return redirect(`/channel/${ucid}${url.search || ""}`, 301)
++			}
++
++			return render(404, "pug/channel-error.pug", {
++				req, settings, subscribed: false, instanceOrigin,
++				data: {
++					error: true,
++					missing: false,
++					ucid: `@${rawHandle}`,
++					row: null,
++					message: `Could not resolve handle @${rawHandle}.`
++				}
++			})
+ 		}
+ 	}
+ ]
+diff --git a/utils/converters.js b/utils/converters.js
+index b33cee0..278c95c 100644
+--- a/utils/converters.js
++++ b/utils/converters.js
+@@ -160,6 +160,8 @@ function rewriteVideoDescription(descriptionHtml, id) {
+ 		}
+ 	})
+ 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtube\\.com/(watch\\?v=${constants.regex.video_id}(?:[^"]*)?|channel/[^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
++	// Rewrite youtube.com/@handle links to local /@handle so they hit the handle resolver above.
++	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtube\\.com/(@[^"]*)">([^<]+)<\/a>`, "g"), `<a href="/$1">$2</a>`)
+ 	descriptionHtml = descriptionHtml.replace(new RegExp(`<a href="https?://(?:www\\.)?youtu\\.be/([^"]*)">([^<]+)<\/a>`, "g"), `<a href="/watch?v=$1">$2</a>`)
+ 	// Strip Invidious pre-built chapter links (they have wrong timestamps and fragment text)
+ 	descriptionHtml = stripInvidiousChapterLinks(descriptionHtml)
+diff --git a/utils/upgradedb.js b/utils/upgradedb.js
+index 545ed61..6c8d817 100644
+--- a/utils/upgradedb.js
++++ b/utils/upgradedb.js
+@@ -95,6 +95,13 @@ const deltas = [
+ 			db.prepare("ALTER TABLE NEW_Subscriptions RENAME TO Subscriptions")
+ 				.run()
+ 		})()
++	},
++	// 13: +Handles (youtube @handle -> ucid cache, handles are case-insensitive so key is lowercased)
++	function() {
++		db.prepare("CREATE TABLE Handles (handle TEXT NOT NULL, ucid TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (handle))")
++			.run()
++		db.prepare("CREATE INDEX Handles_ucid ON Handles (ucid)")
++			.run()
+ 	}
+ ]
+ 
+diff --git a/utils/youtube.js b/utils/youtube.js
+index dad370b..8c206a5 100644
+--- a/utils/youtube.js
++++ b/utils/youtube.js
+@@ -54,4 +54,57 @@ async function fetchChannel(path, ucid, instance) {
+ 	return channel
+ }
+ 
++/**
++ * Resolve a YouTube @handle to a canonical UCID via Invidious
++ * `GET {instance}/api/v1/resolveurl?url=https://www.youtube.com/@handle`.
++ * Returns the UCID string, or null if it cannot be resolved.
++ * Fail-open: never throws for backend errors, just returns null.
++ */
++async function resolveHandleToUcid(handle, instance) {
++	if (!instance) throw new Error("No instance parameter provided")
++	const clean = String(handle || "").replace(/^@/, "").trim()
++	if (!clean) return null
++	const pageURL = `https://www.youtube.com/@${clean}`
++	const fetchURL = `${instance}/api/v1/resolveurl?url=${encodeURIComponent(pageURL)}`
++	let resolved
++	try {
++		resolved = await request(fetchURL).then(res => res.json())
++	} catch (e) {
++		return null
++	}
++	if (!resolved || resolved.error) return null
++	// Invidious returns {ucid, browseId, pageType}. Only accept channel pages.
++	if (resolved.pageType && resolved.pageType !== "WEB_PAGE_TYPE_CHANNEL") return null
++	const ucid = resolved.ucid || resolved.browseId || null
++	if (!ucid || !/^UC[A-Za-z0-9-_]{20,}$/.test(ucid)) return null
++	return ucid
++}
++
++/**
++ * Get the UCID for a handle, using the Handles table as a cache.
++ * Key is lowercased (YouTube handles are case-insensitive).
++ * On cache miss, resolves via the given instance and stores the mapping.
++ * Returns the UCID string, or null if unresolvable.
++ */
++async function getChannelIdForHandle(handle, instance) {
++	const clean = String(handle || "").replace(/^@/, "").trim()
++	if (!clean) return null
++	const key = clean.toLowerCase()
++	try {
++		const hit = db.prepare("SELECT ucid FROM Handles WHERE handle = ?").get(key)
++		if (hit && hit.ucid) return hit.ucid
++	} catch (e) {
++		// table may not exist yet if migration hasn't run; fall through to resolve
++	}
++	const ucid = await resolveHandleToUcid(clean, instance)
++	if (ucid) {
++		try {
++			db.prepare("REPLACE INTO Handles (handle, ucid, updated) VALUES (?, ?, ?)").run(key, ucid, Date.now())
++		} catch (e) {}
++	}
++	return ucid
++}
++
+ module.exports.fetchChannel = fetchChannel
++module.exports.resolveHandleToUcid = resolveHandleToUcid
++module.exports.getChannelIdForHandle = getChannelIdForHandle
+-- 
+2.56.0
+
