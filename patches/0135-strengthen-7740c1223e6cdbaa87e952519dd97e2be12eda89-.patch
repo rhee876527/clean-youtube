@@ -1,0 +1,131 @@
+From 71237dd9dbd85edcfc6c63958418ef2a1682c905 Mon Sep 17 00:00:00 2001
+From: Martin Kibera <martin.kibera.n@gmail.com>
+Date: Mon, 26 Oct 2026 14:20:53 +0300
+Subject: [PATCH] strengthen 7740c1223e6cdbaa87e952519dd97e2be12eda89 by
+ searching title first
+
+videoID is fallback to title search
+---
+ utils/collab-views.js | 78 ++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 58 insertions(+), 20 deletions(-)
+
+diff --git a/utils/collab-views.js b/utils/collab-views.js
+index 00387a3..759b544 100644
+--- a/utils/collab-views.js
++++ b/utils/collab-views.js
+@@ -3,7 +3,9 @@ const {request} = require("./request")
+ // Cache for search-based collab-bug enrichments (views + publish date).
+ // 12h TTL per user request.
+ const CACHE_TTL_MS = 12 * 60 * 60 * 1000
++const NEGATIVE_CACHE_TTL_MS = 30 * 60 * 1000
+ const cache = new Map() // videoId -> {viewCount, viewCountText, published, publishedText, ts}
++const negativeCache = new Map()
+ 
+ function cacheGet(videoId) {
+ 	const entry = cache.get(videoId)
+@@ -16,11 +18,27 @@ function cacheGet(videoId) {
+ }
+ 
+ function cacheSet(videoId, viewCount, viewCountText, published, publishedText) {
++	negativeCache.delete(videoId)
+ 	cache.set(videoId, {viewCount, viewCountText, published, publishedText, ts: Date.now()})
+ }
+ 
++function negativeCacheGet(videoId) {
++	const ts = negativeCache.get(videoId)
++	if (!ts) return false
++	if (Date.now() - ts > NEGATIVE_CACHE_TTL_MS) {
++		negativeCache.delete(videoId)
++		return false
++	}
++	return true
++}
++
++function negativeCacheSet(videoId) {
++	negativeCache.set(videoId, Date.now())
++}
++
+ function cacheClear() {
+ 	cache.clear()
++	negativeCache.clear()
+ }
+ 
+ /**
+@@ -30,7 +48,8 @@ function cacheClear() {
+  */
+ function isSuspect(video) {
+ 	if (!video || typeof video !== "object") return false
+-	if (video.viewCount !== 0) return false
++	const zeroViews = video.viewCount === 0 || (video.viewCount == null && video.viewCountText === "0 views")
++	if (!zeroViews) return false
+ 	if (video.liveNow === true) return false
+ 	if (video.isUpcoming === true) return false
+ 	const prem = video.premiereTimestamp
+@@ -61,26 +80,45 @@ async function enrichOne(video, instance, timeoutMs) {
+ 		delete video.second__viewCountText
+ 		return true
+ 	}
+-	const url = `${instance}/api/v1/search?q=${encodeURIComponent(videoId)}&type=video&hl=en`
+-	const data = await fetchWithTimeout(url, timeoutMs)
+-	if (!Array.isArray(data)) return false
+-	const match = data.find(v => v && v.videoId === videoId)
+-	if (!match || typeof match.viewCount !== "number") return false
+-	// Only apply when search actually has real (non-zero) views.
+-	// A genuine just-published 0-view video stays 0 without extra writes.
+-	if (match.viewCount === 0) return false
+-	cacheSet(videoId, match.viewCount, match.viewCountText ?? null, match.published ?? null, match.publishedText ?? null)
+-	// Views + publish-date patch: do not touch author or any other field.
+-	// Fixing the date matters because normaliseVideoInfo renders a leftover
+-	// "0 seconds ago" as "Live now".
+-	video.viewCount = match.viewCount
+-	video.viewCountText = match.viewCountText ?? video.viewCountText
+-	if (match.published !== undefined && match.published !== null) {
+-		video.published = match.published
+-		video.publishedText = match.publishedText ?? video.publishedText
++	if (negativeCacheGet(videoId)) return false
++	const queries = [
++		video.title,
++		video.title && video.author ? `${video.title} ${video.author}` : null,
++		`https://www.youtube.com/watch?v=${videoId}`,
++		videoId
++	].filter(Boolean)
++	for (const query of queries) {
++		const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&hl=en`
++		let data
++		try {
++			data = await fetchWithTimeout(url, timeoutMs)
++		} catch (e) {
++			continue
++		}
++		if (!Array.isArray(data)) continue
++		const match = data.find(v => v && v.videoId === videoId)
++		if (!match || typeof match.viewCount !== "number") continue
++		// Only apply when search actually has real (non-zero) views.
++		// A genuine just-published 0-view video stays 0 without extra writes.
++		if (match.viewCount === 0) {
++			negativeCacheSet(videoId)
++			return false
++		}
++		cacheSet(videoId, match.viewCount, match.viewCountText ?? null, match.published ?? null, match.publishedText ?? null)
++		// Views + publish-date patch: do not touch author or any other field.
++		// Fixing the date matters because normaliseVideoInfo renders a leftover
++		// "0 seconds ago" as "Live now".
++		video.viewCount = match.viewCount
++		video.viewCountText = match.viewCountText ?? video.viewCountText
++		if (match.published !== undefined && match.published !== null) {
++			video.published = match.published
++			video.publishedText = match.publishedText ?? video.publishedText
++		}
++		delete video.second__viewCountText
++		return true
+ 	}
+-	delete video.second__viewCountText
+-	return true
++	negativeCacheSet(videoId)
++	return false
+ }
+ 
+ /**
+-- 
+2.56.0
+
